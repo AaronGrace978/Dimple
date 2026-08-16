@@ -91,16 +91,23 @@
       <input id="companion" type="text" maxlength="40" placeholder="your name" />
       <label class="lbl" for="tts-engine">voice</label>
       <select id="tts-engine">
+        <option value="local">local voice (Kokoro · like DinoClaw)</option>
         <option value="browser">browser TTS</option>
         <option value="elevenlabs">ElevenLabs</option>
       </select>
       <label class="check"><input type="checkbox" id="tts-on" checked /> Dimple speaks</label>
       <label class="check"><input type="checkbox" id="tts-field" /> also speak field lines</label>
-      <input id="eleven-key" type="password" autocomplete="off" placeholder="ElevenLabs API key" />
-      <label class="lbl" for="eleven-model">elevenlabs model</label>
-      <select id="eleven-model"></select>
-      <label class="lbl" for="eleven-voice">elevenlabs voice</label>
-      <select id="eleven-voice"></select>
+      <div id="local-fields">
+        <label class="lbl" for="local-voice">local voice</label>
+        <select id="local-voice"></select>
+      </div>
+      <div id="eleven-fields">
+        <input id="eleven-key" type="password" autocomplete="off" placeholder="ElevenLabs API key" />
+        <label class="lbl" for="eleven-model">elevenlabs model</label>
+        <select id="eleven-model"></select>
+        <label class="lbl" for="eleven-voice">elevenlabs voice</label>
+        <select id="eleven-voice"></select>
+      </div>
       <div class="row">
         <button type="button" id="save-tts">bind voice</button>
         <button type="button" id="test-tts" class="ghost">test</button>

@@ -1,3 +1,7 @@
+import { playBytes, stopPcm, unlockAudio } from "./audio";
+import { isSteamDeck } from "./quality";
+import { speakLocal } from "./voice";
+
 const KEY = "raymarch_eleven_key";
 const VOICE = "raymarch_eleven_voice";
 const MODEL = "raymarch_eleven_model";
@@ -5,7 +9,7 @@ const ENGINE = "raymarch_tts_engine";
 const ENABLED = "raymarch_tts_on";
 const FIELD = "raymarch_tts_field";
 
-export type TtsEngine = "browser" | "elevenlabs";
+export type TtsEngine = "local" | "browser" | "elevenlabs";
 
 export const ELEVEN_MODELS = [
   "eleven_flash_v2_5",
@@ -20,9 +24,6 @@ const FALLBACK_VOICES = [
   { id: "JBFqnCBsd6RMkjVDRZzb", name: "George" },
   { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura" },
 ];
-
-let currentAudio: HTMLAudioElement | null = null;
-let objectUrl: string | null = null;
 
 export function ttsEnabled(): boolean {
   return localStorage.getItem(ENABLED) !== "0";
@@ -41,8 +42,16 @@ export function setTtsFieldLines(on: boolean): void {
   localStorage.setItem(FIELD, on ? "1" : "0");
 }
 
+export function parseTtsEngine(value: string): TtsEngine {
+  if (value === "elevenlabs" || value === "browser" || value === "local") return value;
+  return "local";
+}
+
 export function ttsEngine(): TtsEngine {
-  return localStorage.getItem(ENGINE) === "elevenlabs" ? "elevenlabs" : "browser";
+  const v = localStorage.getItem(ENGINE);
+  if (v === "elevenlabs") return "elevenlabs";
+  if (v === "browser") return isSteamDeck() ? "local" : "browser";
+  return "local";
 }
 
 export function setTtsEngine(engine: TtsEngine): void {
@@ -76,16 +85,12 @@ export function setElevenModel(id: string): void {
 }
 
 export function stopSpeak(): void {
-  speechSynthesis.cancel();
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = "";
-    currentAudio = null;
+  try {
+    speechSynthesis.cancel();
+  } catch {
+    /* no browser voices */
   }
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl);
-    objectUrl = null;
-  }
+  stopPcm();
 }
 
 export async function listElevenVoices(key = elevenKey()): Promise<{ id: string; name: string }[]> {
@@ -109,26 +114,47 @@ export async function speak(text: string): Promise<void> {
   const line = text.trim();
   if (!line || !ttsEnabled()) return;
   stopSpeak();
+  await unlockAudio();
 
-  if (ttsEngine() === "elevenlabs" && elevenKey()) {
+  const engine = ttsEngine();
+  if (engine === "elevenlabs" && elevenKey()) {
     try {
       await speakEleven(line);
       return;
     } catch {
-      // fall through to browser voice
+      /* Deck / missing key / network — fall through */
     }
   }
-  speakBrowser(line);
+  if (engine !== "browser") {
+    try {
+      await speakLocal(line);
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  if (speakBrowser(line)) return;
+  try {
+    await speakLocal(line);
+  } catch {
+    /* nowhere left to speak */
+  }
 }
 
-function speakBrowser(text: string): void {
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.rate = 0.96;
-  utter.pitch = 1.05;
-  const voices = speechSynthesis.getVoices();
-  const soft = voices.find((v) => /natural|neural|aria|jenny|samantha|google/i.test(v.name));
-  if (soft) utter.voice = soft;
-  speechSynthesis.speak(utter);
+function speakBrowser(text: string): boolean {
+  try {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length && isSteamDeck()) return false;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.96;
+    utter.pitch = 1.05;
+    const soft = voices.find((v) => /natural|neural|aria|jenny|samantha|google/i.test(v.name));
+    if (soft) utter.voice = soft;
+    speechSynthesis.speak(utter);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function speakEleven(text: string): Promise<void> {
@@ -149,9 +175,5 @@ async function speakEleven(text: string): Promise<void> {
     },
   );
   if (!res.ok) throw new Error("elevenlabs failed");
-  const blob = await res.blob();
-  objectUrl = URL.createObjectURL(blob);
-  currentAudio = new Audio(objectUrl);
-  currentAudio.onended = () => stopSpeak();
-  await currentAudio.play();
+  await playBytes(await res.arrayBuffer());
 }

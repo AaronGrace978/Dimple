@@ -1,10 +1,10 @@
+import { unlockAudio } from "./audio";
 import { isSteamDeck } from "./quality";
 import { prepareWhisper, transcribePcm } from "./whisper";
 
 const MAX_SECONDS = 45;
 
 let stream: MediaStream | null = null;
-let audioCtx: AudioContext | null = null;
 let processor: ScriptProcessorNode | null = null;
 let mute: GainNode | null = null;
 let samples: number[] = [];
@@ -33,8 +33,6 @@ export function stopListen(): void {
   cleanupGraph();
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
-  void audioCtx?.close();
-  audioCtx = null;
   samples = [];
 }
 
@@ -51,8 +49,7 @@ export async function pttStart(onStatus?: (s: string) => void): Promise<void> {
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       });
     }
-    audioCtx = audioCtx ?? new AudioContext();
-    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const audioCtx = await unlockAudio();
     captureRate = audioCtx.sampleRate;
     const source = audioCtx.createMediaStreamSource(stream);
     processor = audioCtx.createScriptProcessor(4096, 1, 1);
