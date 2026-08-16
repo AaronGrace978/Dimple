@@ -12,7 +12,13 @@ win:
   target:
     - nsis
     - portable
-  artifactName: Dimple-${version}-windows-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Dimple
+  artifactName: Dimple-${version}-windows-setup.${ext}
+portable:
+  artifactName: Dimple-${version}-windows-portable.${ext}
 mac:
   target:
     - dmg
@@ -26,10 +32,6 @@ linux:
   category: Game
   executableName: Dimple
   artifactName: Dimple-${version}-linux-${arch}.${ext}
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  shortcutName: Dimple
 publish:
   - provider: github
     owner: AaronGrace978
