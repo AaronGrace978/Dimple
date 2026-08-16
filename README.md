@@ -12,11 +12,11 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 | macOS | `Dimple-*-mac-*.dmg` | Right-click → Open if Gatekeeper complains |
 | Linux / Steam Deck | `Dimple-*-linux-*.AppImage` | Desktop Mode: mark executable, add as a non-Steam game. **F11** fullscreen |
 
-No `.env`. Open Settings in-app and bind a key if you want him thinking or speaking (ElevenLabs / browser TTS).
+No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
 ## Steam Deck
 
-Download `Dimple-*-linux-x86_64.AppImage`. Desktop Mode → mark executable → **Add a Non-Steam Game**. Game Mode launches fullscreen. Settings → field quality is **auto** (Deck uses the 40 fps preset).
+Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode → unpack into `~/Dimple` → **Add a Non-Steam Game** pointing at `/home/deck/Dimple/Dimple`. Game Mode launches fullscreen. Settings → field quality is **auto** (Deck uses the 40 fps preset). Voice is **local Kokoro** by default so you can hear him without ElevenLabs.
 
 | Control | What it does |
 | --- | --- |

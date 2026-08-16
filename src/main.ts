@@ -28,6 +28,7 @@ import {
   elevenModel,
   elevenVoice,
   listElevenVoices,
+  parseTtsEngine,
   setElevenKey,
   setElevenModel,
   setElevenVoice,
@@ -42,6 +43,8 @@ import {
 } from "./tts";
 import { pollGamepad } from "./controls";
 import { canListen, guardDoubleType, isHoldingTalk, pttStart, pttStop, stopListen, wakeKeyboard } from "./listen";
+import { unlockAudio } from "./audio";
+import { LOCAL_VOICES, localVoice, onVoiceStatus, prepareLocalVoice, setLocalVoice } from "./voice";
 import { onWhisperStatus } from "./whisper";
 import {
   isSteamDeck,
@@ -76,6 +79,9 @@ const ttsField = document.querySelector<HTMLInputElement>("#tts-field")!;
 const elevenKeyInput = document.querySelector<HTMLInputElement>("#eleven-key")!;
 const elevenModelSelect = document.querySelector<HTMLSelectElement>("#eleven-model")!;
 const elevenVoiceSelect = document.querySelector<HTMLSelectElement>("#eleven-voice")!;
+const elevenFields = document.querySelector("#eleven-fields")!;
+const localFields = document.querySelector("#local-fields")!;
+const localVoiceSelect = document.querySelector<HTMLSelectElement>("#local-voice")!;
 const muteBtn = document.querySelector("#mute-chat")!;
 const minBtn = document.querySelector("#min-chat")!;
 const talkBtn = document.querySelector("#talk-chat")!;
@@ -249,7 +255,29 @@ function fillTts(): void {
     elevenModelSelect.append(opt);
   }
   elevenModelSelect.value = elevenModel();
+  localVoiceSelect.innerHTML = "";
+  for (const v of LOCAL_VOICES) {
+    const opt = document.createElement("option");
+    opt.value = v.id;
+    opt.textContent = v.name;
+    localVoiceSelect.append(opt);
+  }
+  localVoiceSelect.value = localVoice();
+  syncTtsFields();
   syncMute();
+}
+
+function syncTtsFields(): void {
+  const engine = parseTtsEngine(ttsEngineSelect.value);
+  elevenFields.classList.toggle("hidden", engine !== "elevenlabs");
+  localFields.classList.toggle("hidden", engine === "elevenlabs");
+}
+
+function voiceLabel(): string {
+  const engine = ttsEngine();
+  if (engine === "elevenlabs" && elevenKey()) return "voice bound · ElevenLabs";
+  if (engine === "browser") return "voice · browser TTS";
+  return `voice · local ${LOCAL_VOICES.find((v) => v.id === localVoice())?.name ?? "Kokoro"}`;
 }
 
 async function fillVoices(): Promise<void> {
@@ -335,6 +363,7 @@ function closePanels(): void {
 function sendChat(text: string): void {
   const said = text.trim();
   if (!said || chatting) return;
+  void unlockAudio();
   chatInput.value = "";
   appendChat("you", said);
   renderChat();
@@ -479,6 +508,13 @@ fillProviders();
 syncPanel();
 fillTts();
 void fillVoices();
+void prepareLocalVoice().catch(() => undefined);
+window.addEventListener("pointerdown", () => {
+  void unlockAudio();
+}, { once: true });
+window.addEventListener("keydown", () => {
+  void unlockAudio();
+}, { once: true });
 seedDimple();
 renderChat();
 restoreChat();
@@ -488,6 +524,9 @@ renderer.applyQuality();
 guardDoubleType(chatInput);
 setTalkUi("hold talk", false);
 onWhisperStatus((s) => {
+  keyStatus.textContent = s;
+});
+onVoiceStatus((s) => {
   keyStatus.textContent = s;
 });
 attachDrag(chatWindow, document.querySelector("#chat-drag")!, saveChatUi);
@@ -564,29 +603,33 @@ document.querySelector("#clear-memory")!.addEventListener("click", () => {
 });
 
 document.querySelector("#save-tts")!.addEventListener("click", () => {
-  setTtsEngine(ttsEngineSelect.value === "elevenlabs" ? "elevenlabs" : "browser");
+  setTtsEngine(parseTtsEngine(ttsEngineSelect.value));
   setTtsEnabled(ttsOn.checked);
   setTtsFieldLines(ttsField.checked);
+  setLocalVoice(localVoiceSelect.value);
   setElevenKey(elevenKeyInput.value);
   setElevenModel(elevenModelSelect.value);
   setElevenVoice(elevenVoiceSelect.value);
   elevenKeyInput.value = "";
   syncMute();
+  syncTtsFields();
   void fillVoices();
-  keyStatus.textContent =
-    ttsEngine() === "elevenlabs" && elevenKey()
-      ? "voice bound · ElevenLabs"
-      : "voice · browser TTS";
+  keyStatus.textContent = voiceLabel();
+  void unlockAudio();
+  if (ttsEnabled()) void speak("hey. i'm dimple. this field is home.");
 });
 
 document.querySelector("#test-tts")!.addEventListener("click", () => {
-  setTtsEngine(ttsEngineSelect.value === "elevenlabs" ? "elevenlabs" : "browser");
+  setTtsEngine(parseTtsEngine(ttsEngineSelect.value));
   setTtsEnabled(true);
   ttsOn.checked = true;
+  setLocalVoice(localVoiceSelect.value);
   if (elevenKeyInput.value.trim()) setElevenKey(elevenKeyInput.value);
   setElevenModel(elevenModelSelect.value);
   setElevenVoice(elevenVoiceSelect.value);
   syncMute();
+  syncTtsFields();
+  void unlockAudio();
   void speak("hey. i'm dimple. this field is home.");
 });
 
@@ -596,8 +639,10 @@ ttsOn.addEventListener("change", () => {
 });
 ttsField.addEventListener("change", () => setTtsFieldLines(ttsField.checked));
 ttsEngineSelect.addEventListener("change", () => {
-  setTtsEngine(ttsEngineSelect.value === "elevenlabs" ? "elevenlabs" : "browser");
+  setTtsEngine(parseTtsEngine(ttsEngineSelect.value));
+  syncTtsFields();
 });
+localVoiceSelect.addEventListener("change", () => setLocalVoice(localVoiceSelect.value));
 elevenVoiceSelect.addEventListener("change", () => setElevenVoice(elevenVoiceSelect.value));
 elevenModelSelect.addEventListener("change", () => setElevenModel(elevenModelSelect.value));
 
