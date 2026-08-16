@@ -1,0 +1,36 @@
+appId: io.bostonai.dimple
+productName: Dimple
+copyright: Copyright © 2026 Aaron Grace
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - nsis
+    - portable
+  artifactName: Dimple-${version}-windows-${arch}.${ext}
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games
+  artifactName: Dimple-${version}-mac-${arch}.${ext}
+linux:
+  target:
+    - AppImage
+    - tar.gz
+  category: Game
+  executableName: Dimple
+  artifactName: Dimple-${version}-linux-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Dimple
+publish:
+  - provider: github
+    owner: AaronGrace978
+    repo: RayMarchPrime

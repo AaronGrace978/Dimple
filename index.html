@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dimple — a buddy inside the field</title>
+    <meta
+      name="description"
+      content="Dimple lives inside a WebGL signed-distance raymarcher. The field is the body."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <div id="hud">
+      <header>
+        <div class="brand">
+          <span class="mark">DIMPLE</span>
+          <span class="sub">your buddy in the field</span>
+        </div>
+        <div class="hud-right">
+          <div id="stats" class="mono">iso 0.40 · wander</div>
+          <div class="hud-actions">
+            <button type="button" id="open-chat" class="icon-btn">chat</button>
+            <button type="button" id="open-caption" class="icon-btn">line</button>
+            <button type="button" id="open-settings" class="icon-btn">settings</button>
+          </div>
+        </div>
+      </header>
+
+      <footer>
+        <span>click the floor — Dimple notices the dimple</span>
+        <span class="keys">drag orbit · scroll zoom · C chat · S settings · F follow</span>
+      </footer>
+    </div>
+
+    <aside id="caption" aria-label="Dimple's line">
+      <div class="cap-head" id="caption-drag">
+        <span class="mono">whisper</span>
+        <button type="button" id="hide-caption" class="icon-btn">hide</button>
+      </div>
+      <p id="speech"></p>
+    </aside>
+
+    <aside id="chat-window" class="hidden" aria-label="Chat with Dimple">
+      <div class="win-head" id="chat-drag">
+        <div>
+          <strong>Dimple</strong>
+          <span class="mono" id="chat-glass-label">drag me · see-through</span>
+        </div>
+        <div class="win-btns">
+          <button type="button" id="min-chat" class="icon-btn">min</button>
+          <button type="button" id="mute-chat" class="icon-btn">voice</button>
+          <button type="button" id="close-chat" class="icon-btn">close</button>
+        </div>
+      </div>
+      <div id="chat-log"></div>
+      <form id="chat-form">
+        <input id="chat-input" type="text" autocomplete="off" maxlength="400" placeholder="talk to Dimple…" />
+        <button type="submit">send</button>
+      </form>
+    </aside>
+
+    <div id="settings" class="hidden" role="dialog" aria-label="Settings">
+      <h2>Settings</h2>
+      <p id="provider-hint">
+        Dimple is always alive locally. Bind a provider and he starts thinking
+        with the field. No .env — keys stay in this browser.
+      </p>
+      <label class="lbl" for="companion">what Dimple calls you</label>
+      <input id="companion" type="text" maxlength="40" placeholder="your name" />
+      <label class="lbl" for="tts-engine">voice</label>
+      <select id="tts-engine">
+        <option value="browser">browser TTS</option>
+        <option value="elevenlabs">ElevenLabs</option>
+      </select>
+      <label class="check"><input type="checkbox" id="tts-on" checked /> Dimple speaks</label>
+      <label class="check"><input type="checkbox" id="tts-field" /> also speak field lines</label>
+      <input id="eleven-key" type="password" autocomplete="off" placeholder="ElevenLabs API key" />
+      <label class="lbl" for="eleven-model">elevenlabs model</label>
+      <select id="eleven-model"></select>
+      <label class="lbl" for="eleven-voice">elevenlabs voice</label>
+      <select id="eleven-voice"></select>
+      <div class="row">
+        <button type="button" id="save-tts">bind voice</button>
+        <button type="button" id="test-tts" class="ghost">test</button>
+      </div>
+      <label class="lbl" for="provider">provider</label>
+      <select id="provider"></select>
+      <label class="lbl" for="model">model</label>
+      <select id="model"></select>
+      <input id="custom-model" type="text" spellcheck="false" placeholder="custom model id" />
+      <input id="api-key" type="password" autocomplete="off" placeholder="api key" />
+      <div class="row">
+        <button type="button" id="save-key">bind</button>
+        <button type="button" id="refresh-models" class="ghost">latest</button>
+        <button type="button" id="clear-key" class="ghost">unbind</button>
+      </div>
+      <div class="row">
+        <button type="button" id="clear-memory" class="ghost">forget me</button>
+        <button type="button" id="close-settings" class="ghost">close</button>
+      </div>
+      <p id="key-status" class="mono"></p>
+    </div>
+
+    <div id="boot">waking Dimple…</div>
+    <div id="fatal" class="hidden"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

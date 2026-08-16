@@ -1,0 +1,26 @@
+{
+  "name": "dimple",
+  "productName": "Dimple",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "author": "Aaron Grace",
+  "description": "Dimple — a buddy who lives inside a signed distance field.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "launch": "node scripts/launch.mjs",
+    "start": "node scripts/launch.mjs",
+    "desktop": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
