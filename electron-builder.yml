@@ -32,11 +32,6 @@ linux:
   category: Game
   executableName: Dimple
   artifactName: Dimple-${version}-linux-${arch}.${ext}
-  synopsis: Dimple — a buddy inside a signed distance field
-  desktop:
-    Name: Dimple
-    Terminal: false
-    StartupNotify: false
 publish:
   - provider: github
     owner: AaronGrace978
