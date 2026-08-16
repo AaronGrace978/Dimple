@@ -2,7 +2,7 @@
   "name": "dimple",
   "productName": "Dimple",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "main": "electron/main.mjs",
   "author": "Aaron Grace",
@@ -16,6 +16,9 @@
     "desktop": "npm run build && electron .",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.2"
   },
   "devDependencies": {
     "electron": "^36.4.0",

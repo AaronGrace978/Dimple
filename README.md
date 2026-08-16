@@ -20,14 +20,16 @@ Download `Dimple-*-linux-x86_64.AppImage`. Desktop Mode → mark executable → 
 
 | Control | What it does |
 | --- | --- |
-| **A** | Open chat (Steam keyboard). Send if you already typed |
-| **X** | Talk — hold the mic, Dimple hears you |
+| **HOLD X** or **HOLD L2** | Push-to-talk (local Whisper, same idea as DinoClaw) |
+| **HOLD talk** | Same PTT on screen |
+| **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
 | **B** | Close chat / settings |
 | **START** | Settings |
 | **SELECT** | Chat |
 | **Right stick** | Look |
-| **L2 / R2** | Zoom |
+| **R2** | Zoom |
+| **STEAM + X** | Keyboard |
 | **D-pad down** or **L3/R3** | Tap the floor (he notices) |
 | **STEAM + X** | Keyboard if talk doesn't grab the mic |
 If sticks don't look, open Dimple in Steam → Controller → use a **Gamepad** layout (not mouse-only).

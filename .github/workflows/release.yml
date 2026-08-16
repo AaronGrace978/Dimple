@@ -9,7 +9,7 @@ on:
       tag:
         description: Release tag to attach builds to
         required: true
-        default: v0.1.2
+        default: v0.1.3
 
 permissions:
   contents: write

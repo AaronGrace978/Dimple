@@ -162,6 +162,9 @@ async function createWindow() {
   const server = await startServer();
   const addr = server.address();
   const port = typeof addr === "object" && addr ? addr.port : PREFERRED_PORT;
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    return permission === "media" || permission === "audioCapture" || permission === "clipboard-sanitized-write";
+  });
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(permission === "media" || permission === "audioCapture");
   });

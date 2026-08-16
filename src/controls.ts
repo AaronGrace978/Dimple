@@ -2,6 +2,7 @@ import type { OrbitCamera } from "./camera";
 
 const DEAD = 0.18;
 const prev: boolean[] = [];
+let pttHeld = false;
 
 export type ControlHooks = {
   chatOpen: () => boolean;
@@ -10,8 +11,8 @@ export type ControlHooks = {
   closePanels: () => void;
   toggleSettings: () => void;
   toggleFollow: () => void;
-  talk: () => void;
-  sendTyped: () => void;
+  pttStart: () => void;
+  pttStop: () => void;
   tapCenter: () => void;
 };
 
@@ -36,26 +37,33 @@ export function pollGamepad(
   const pad = pads[0] ?? pads[1];
   if (!pad) return;
 
+  const typing = hooks.typing();
   const lx = axis(pad, 0);
   const ly = axis(pad, 1);
   const rx = axis(pad, 2);
   const ry = axis(pad, 3);
   const l2 = pad.buttons[6]?.value ?? 0;
   const r2 = pad.buttons[7]?.value ?? 0;
+  const xBtn = Boolean(pad.buttons[2]?.pressed);
+  const wantPtt = xBtn || l2 > 0.45;
 
-  if (!hooks.typing()) {
-    cam.look((rx + lx * 0.35) * dt * 2.4, (ry + ly * 0.2) * dt * 1.9);
-    const zoom = 1 + (ly * 0.35 + (r2 - l2)) * dt * 1.6;
-    cam.zoomBy(zoom);
+  if (wantPtt && !pttHeld) hooks.pttStart();
+  if (!wantPtt && pttHeld) hooks.pttStop();
+  pttHeld = wantPtt;
+
+  if (typing) {
+    if (edge(pad, 1)) hooks.closePanels();
+    return;
   }
+
+  cam.look((rx + lx * 0.35) * dt * 2.4, (ry + ly * 0.2) * dt * 1.9);
+  cam.zoomBy(1 + (ly * 0.35 + (r2 - (wantPtt ? 0 : l2))) * dt * 1.6);
 
   if (edge(pad, 0)) {
-    if (hooks.chatOpen() && hooks.typing()) hooks.sendTyped();
-    else if (hooks.chatOpen()) hooks.sendTyped();
-    else hooks.openChat();
+    if (hooks.chatOpen()) return;
+    hooks.openChat();
   }
   if (edge(pad, 1)) hooks.closePanels();
-  if (edge(pad, 2)) hooks.talk();
   if (edge(pad, 3)) hooks.toggleFollow();
   if (edge(pad, 8)) hooks.openChat();
   if (edge(pad, 9)) hooks.toggleSettings();

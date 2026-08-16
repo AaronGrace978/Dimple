@@ -41,7 +41,8 @@ import {
   ttsFieldLines,
 } from "./tts";
 import { pollGamepad } from "./controls";
-import { canListen, listenOnce, stopListen, wakeKeyboard } from "./listen";
+import { canListen, guardDoubleType, isHoldingTalk, pttStart, pttStop, stopListen, wakeKeyboard } from "./listen";
+import { onWhisperStatus } from "./whisper";
 import {
   isSteamDeck,
   loadQuality,
@@ -297,8 +298,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "A chat · X talk · Y follow · B back · START settings · STEAM+X keyboard · RS look"
-    : "drag orbit · scroll zoom · C chat · S settings · F follow";
+    ? "HOLD X or L2 talk · A chat · Y follow · B back · STEAM+X keyboard · RS look"
+    : "drag orbit · scroll zoom · HOLD T talk · C chat · S settings · F follow";
 }
 
 function toggleSettings(): void {
@@ -361,24 +362,54 @@ function sendChat(text: string): void {
 function sendTyped(): void {
   const text = chatInput.value.trim();
   if (text) sendChat(text);
-  else if (!chatWindow.classList.contains("hidden")) wakeKeyboard(chatInput);
-  else toggleChat(true);
 }
 
-async function startTalk(): Promise<void> {
+function setTalkUi(label: string, hot: boolean): void {
+  talkBtn.textContent = label;
+  talkBtn.classList.toggle("hot", hot);
+  openTalk.textContent = hot ? "…" : "talk";
+}
+
+async function beginPtt(): Promise<void> {
+  if (isHoldingTalk()) return;
   toggleChat(true);
+  chatInput.blur();
   if (!canListen()) {
-    wakeKeyboard(chatInput);
-    keyStatus.textContent = "mic off — STEAM+X to type";
+    setTalkUi("no mic", false);
+    keyStatus.textContent = "mic blocked — check Steam mic permission";
     return;
   }
-  talkBtn.classList.add("hot");
-  talkBtn.textContent = "…";
-  const said = await listenOnce();
-  talkBtn.classList.remove("hot");
-  talkBtn.textContent = "talk";
+  setTalkUi("listening", true);
+  await pttStart((s) => {
+    keyStatus.textContent = s;
+    if (s.startsWith("hold")) setTalkUi("listening", true);
+  });
+}
+
+async function endPtt(): Promise<void> {
+  if (!isHoldingTalk()) return;
+  setTalkUi("whisper…", true);
+  const said = await pttStop((s) => {
+    keyStatus.textContent = s;
+  });
+  setTalkUi("hold talk", false);
   if (said) sendChat(said);
-  else wakeKeyboard(chatInput);
+}
+
+function bindPtt(el: HTMLElement): void {
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    void beginPtt();
+  });
+  el.addEventListener("pointerup", () => {
+    void endPtt();
+  });
+  el.addEventListener("pointercancel", () => {
+    void endPtt();
+  });
+  el.addEventListener("click", (e) => e.preventDefault());
 }
 
 function attachDrag(
@@ -454,18 +485,19 @@ restoreChat();
 restoreCaption();
 applyChrome();
 renderer.applyQuality();
+guardDoubleType(chatInput);
+setTalkUi("hold talk", false);
+onWhisperStatus((s) => {
+  keyStatus.textContent = s;
+});
 attachDrag(chatWindow, document.querySelector("#chat-drag")!, saveChatUi);
 attachDrag(caption, document.querySelector("#caption-drag")!, saveCaptionUi);
 syncMute();
 
 document.querySelector("#open-chat")!.addEventListener("click", () => toggleChat(true));
 document.querySelector("#open-settings")!.addEventListener("click", toggleSettings);
-openTalk.addEventListener("click", () => {
-  void startTalk();
-});
-talkBtn.addEventListener("click", () => {
-  void startTalk();
-});
+bindPtt(openTalk as HTMLElement);
+bindPtt(talkBtn as HTMLElement);
 qualitySelect.addEventListener("change", () => {
   saveQuality(qualitySelect.value as QualityId);
   renderer.applyQuality();
@@ -575,6 +607,7 @@ document.querySelector("#chat-form")!.addEventListener("submit", (e) => {
 });
 
 window.addEventListener("keydown", (e) => {
+  if (e.repeat) return;
   if (typing()) {
     if (e.key === "Escape") {
       settings.classList.add("hidden");
@@ -586,7 +619,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "f" || e.key === "F") camera.follow = !camera.follow;
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
-  if (e.key === "t" || e.key === "T") void startTalk();
+  if (e.key === "t" || e.key === "T") void beginPtt();
   if (e.key === "l" || e.key === "L") {
     mind.useLlm = !mind.useLlm && hasMind(mind.provider);
     keyStatus.textContent = mind.useLlm
@@ -596,6 +629,9 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closePanels();
   }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.key === "t" || e.key === "T") void endPtt();
 });
 
 let last = performance.now();
@@ -624,10 +660,12 @@ function frame(now: number): void {
     toggleFollow: () => {
       camera.follow = !camera.follow;
     },
-    talk: () => {
-      void startTalk();
+    pttStart: () => {
+      void beginPtt();
     },
-    sendTyped,
+    pttStop: () => {
+      void endPtt();
+    },
     tapCenter: () => placeVisitor(0.5, 0.62),
   }, dt);
 
