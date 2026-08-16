@@ -60,20 +60,13 @@ export class Renderer {
   tier: QualityTier = 2;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    const gl =
-      canvas.getContext("webgl2", {
-        antialias: false,
-        alpha: false,
-        depth: false,
-        stencil: false,
-        powerPreference: "high-performance",
-        desynchronized: true,
-      }) ??
-      canvas.getContext("webgl2", {
-        antialias: false,
-        alpha: false,
-        powerPreference: "high-performance",
-      });
+    const gl = canvas.getContext("webgl2", {
+      antialias: false,
+      alpha: false,
+      depth: false,
+      stencil: false,
+      powerPreference: "high-performance",
+    });
     if (!gl) throw new Error("WebGL2 is required to enter the field.");
     this.gl = gl;
     this.prog = program(gl, vertSrc, fragSrc);

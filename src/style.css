@@ -16,7 +16,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-family: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   overflow: hidden;
 }
 

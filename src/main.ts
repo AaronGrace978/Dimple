@@ -96,8 +96,6 @@ try {
   fail(err instanceof Error ? err.message : "WebGL2 failed to start.");
 }
 
-boot.classList.add("hidden");
-
 const presence = new Presence();
 const camera = new OrbitCamera();
 const mind = new Mind();
@@ -653,6 +651,7 @@ function frame(now: number): void {
     trail2: snap.trail2,
     trailW: snap.trailW,
   });
+  boot.classList.add("hidden");
 
   const remote =
     hasMind(mind.provider) && mind.useLlm

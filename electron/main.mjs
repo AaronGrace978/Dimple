@@ -3,10 +3,10 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, globalShortcut, session, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, session, shell } from "electron";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 17321;
+const PREFERRED_PORT = 17321;
 
 const PROXY = [
   ["/p/openai", "https://api.openai.com"],
@@ -42,14 +42,6 @@ function distRoot() {
 
 function isSteamDeck() {
   if (process.env.STEAMDECK === "1" || process.env.SteamDeck === "1") return true;
-  if (process.env.SteamGameId || process.env.SteamAppId) {
-    try {
-      const name = readFileSync("/sys/devices/virtual/dmi/id/board_name", "utf8");
-      if (/Jupiter|Galileo/i.test(name)) return true;
-    } catch {
-      /* not a deck board */
-    }
-  }
   try {
     const name = readFileSync("/sys/devices/virtual/dmi/id/board_name", "utf8");
     if (/Jupiter|Galileo/i.test(name)) return true;
@@ -95,6 +87,17 @@ async function proxyRequest(req, res, prefix, target) {
   res.end(buf);
 }
 
+function fileFromUrl(urlPath) {
+  const decoded = decodeURIComponent(urlPath === "/" ? "index.html" : urlPath);
+  const relative = decoded.replace(/^\/+/, "").replace(/\\/g, "/");
+  if (!relative || relative.includes("..")) return null;
+  const root = distRoot();
+  const full = path.normalize(path.join(root, relative));
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (full !== root && !full.startsWith(prefix)) return null;
+  return full;
+}
+
 function startServer() {
   return new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
@@ -111,9 +114,8 @@ function startServer() {
           await proxyRequest(req, res, proxied.prefix, proxied.target);
           return;
         }
-        let file = urlPath === "/" ? "/index.html" : urlPath;
-        const full = path.normalize(path.join(distRoot(), file));
-        if (!full.startsWith(distRoot())) {
+        const full = fileFromUrl(urlPath);
+        if (!full) {
           res.writeHead(403);
           res.end("no");
           return;
@@ -127,32 +129,39 @@ function startServer() {
           const data = await readFile(path.join(distRoot(), "index.html"));
           res.writeHead(200, { "content-type": MIME[".html"] });
           res.end(data);
-        } catch {
+        } catch (err) {
           res.writeHead(500);
-          res.end("Dimple could not wake");
+          res.end(String(err));
         }
       }
     });
-    server.on("error", reject);
-    server.listen(PORT, "127.0.0.1", () => resolve(server));
+    server.on("error", (err) => {
+      if (err && err.code === "EADDRINUSE") {
+        server.listen(0, "127.0.0.1");
+        return;
+      }
+      reject(err);
+    });
+    server.listen(PREFERRED_PORT, "127.0.0.1", () => resolve(server));
   });
 }
 
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
-app.commandLine.appendSwitch("enable-zero-copy");
 if (process.platform === "linux") {
-  app.commandLine.appendSwitch("use-gl", "angle");
-  app.commandLine.appendSwitch("use-angle", "gl");
   app.commandLine.appendSwitch("no-sandbox");
   app.commandLine.appendSwitch("disable-gpu-sandbox");
+  app.commandLine.appendSwitch("in-process-gpu");
+  app.commandLine.appendSwitch("ozone-platform-hint", "x11");
 }
 
 let win;
 const deck = isSteamDeck();
 
 async function createWindow() {
-  await startServer();
+  const server = await startServer();
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : PREFERRED_PORT;
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(permission === "media" || permission === "audioCapture");
   });
@@ -165,17 +174,22 @@ async function createWindow() {
     backgroundColor: "#07070a",
     autoHideMenuBar: true,
     fullscreen: deck,
+    show: false,
     webPreferences: {
-      sandbox: true,
+      sandbox: process.platform !== "linux",
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
     },
   });
   win.removeMenu();
+  win.once("ready-to-show", () => win.show());
   const url = deck
-    ? `http://127.0.0.1:${PORT}/?deck=1`
-    : `http://127.0.0.1:${PORT}/`;
+    ? `http://127.0.0.1:${port}/?deck=1`
+    : `http://127.0.0.1:${port}/`;
+  win.webContents.on("did-fail-load", (_e, code, desc, failedUrl) => {
+    void dialog.showErrorBox("Dimple", `Could not wake the field (${code}): ${desc}\n${failedUrl}`);
+  });
   await win.loadURL(url);
   win.webContents.setWindowOpenHandler(({ url: openUrl }) => {
     void shell.openExternal(openUrl);
@@ -184,10 +198,15 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await createWindow();
-  globalShortcut.register("F11", () => {
-    if (win) win.setFullScreen(!win.isFullScreen());
-  });
+  try {
+    await createWindow();
+    globalShortcut.register("F11", () => {
+      if (win) win.setFullScreen(!win.isFullScreen());
+    });
+  } catch (err) {
+    dialog.showErrorBox("Dimple", err instanceof Error ? err.message : String(err));
+    app.quit();
+  }
 });
 
 app.on("window-all-closed", () => {
