@@ -59,13 +59,10 @@ export function pollGamepad(
   cam.look((rx + lx * 0.35) * dt * 2.4, (ry + ly * 0.2) * dt * 1.9);
   cam.zoomBy(1 + (ly * 0.35 + (r2 - (wantPtt ? 0 : l2))) * dt * 1.6);
 
-  if (edge(pad, 0)) {
-    if (hooks.chatOpen()) return;
-    hooks.openChat();
-  }
+  if (edge(pad, 0) && !pttHeld && !hooks.chatOpen()) hooks.openChat();
   if (edge(pad, 1)) hooks.closePanels();
   if (edge(pad, 3)) hooks.toggleFollow();
-  if (edge(pad, 8)) hooks.openChat();
+  if (edge(pad, 8) && !pttHeld) hooks.openChat();
   if (edge(pad, 9)) hooks.toggleSettings();
   if (edge(pad, 12)) hooks.toggleFollow();
   if (edge(pad, 13)) hooks.tapCenter();

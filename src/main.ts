@@ -337,7 +337,7 @@ function toggleSettings(): void {
   }
 }
 
-function toggleChat(forceOpen = false): void {
+function toggleChat(forceOpen = false, opts?: { focus?: boolean }): void {
   if (forceOpen) chatWindow.classList.remove("hidden");
   else chatWindow.classList.toggle("hidden");
   if (!chatWindow.classList.contains("hidden")) {
@@ -345,10 +345,9 @@ function toggleChat(forceOpen = false): void {
     minBtn.textContent = "min";
     restoreChat();
     renderChat();
-    wakeKeyboard(chatInput);
+    if (opts?.focus !== false) wakeKeyboard(chatInput);
   } else {
-    stopListen();
-    talkBtn.classList.remove("hot");
+    chatInput.blur();
   }
 }
 
@@ -401,7 +400,6 @@ function setTalkUi(label: string, hot: boolean): void {
 
 async function beginPtt(): Promise<void> {
   if (isHoldingTalk()) return;
-  toggleChat(true);
   chatInput.blur();
   if (!canListen()) {
     setTalkUi("no mic", false);
@@ -409,6 +407,8 @@ async function beginPtt(): Promise<void> {
     return;
   }
   setTalkUi("listening", true);
+  speechEl.textContent = "listening… hold X";
+  caption.classList.add("on");
   await pttStart((s) => {
     keyStatus.textContent = s;
     if (s.startsWith("hold")) setTalkUi("listening", true);

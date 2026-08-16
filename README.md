@@ -20,7 +20,7 @@ Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode â†’ unpack into `~/Dimple` â†
 
 | Control | What it does |
 | --- | --- |
-| **HOLD X** or **HOLD L2** | Push-to-talk (local Whisper, same idea as DinoClaw) |
+| **HOLD X** or **HOLD L2** | Push-to-talk. Does **not** open chat (chat steals the mic / voice). Caption shows listening, then he speaks. |
 | **HOLD talk** | Same PTT on screen |
 | **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
