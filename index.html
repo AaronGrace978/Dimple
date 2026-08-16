@@ -28,6 +28,7 @@
           <div id="stats" class="mono">iso 0.40 · wander</div>
           <div class="hud-actions">
             <button type="button" id="open-chat" class="icon-btn">chat</button>
+            <button type="button" id="open-talk" class="icon-btn">talk</button>
             <button type="button" id="open-caption" class="icon-btn">line</button>
             <button type="button" id="open-settings" class="icon-btn">settings</button>
           </div>
@@ -36,7 +37,7 @@
 
       <footer>
         <span>click the floor — Dimple notices the dimple</span>
-        <span class="keys">drag orbit · scroll zoom · C chat · S settings · F follow</span>
+        <span class="keys" id="help-keys">drag orbit · scroll zoom · C chat · S settings · F follow</span>
       </footer>
     </div>
 
@@ -62,7 +63,19 @@
       </div>
       <div id="chat-log"></div>
       <form id="chat-form">
-        <input id="chat-input" type="text" autocomplete="off" maxlength="400" placeholder="talk to Dimple…" />
+        <button type="button" id="talk-chat" class="talk-btn">talk</button>
+        <input
+          id="chat-input"
+          type="text"
+          autocomplete="off"
+          autocorrect="on"
+          autocapitalize="sentences"
+          spellcheck="true"
+          inputmode="text"
+          enterkeyhint="send"
+          maxlength="400"
+          placeholder="talk to Dimple…"
+        />
         <button type="submit">send</button>
       </form>
     </aside>
@@ -73,6 +86,13 @@
         Dimple is always alive locally. Bind a provider and he starts thinking
         with the field. No .env — keys stay in this browser.
       </p>
+      <label class="lbl" for="quality">field quality</label>
+      <select id="quality">
+        <option value="auto">auto · Steam Deck uses deck</option>
+        <option value="deck">deck · 40 fps handheld</option>
+        <option value="medium">medium</option>
+        <option value="high">high</option>
+      </select>
       <label class="lbl" for="companion">what Dimple calls you</label>
       <input id="companion" type="text" maxlength="40" placeholder="your name" />
       <label class="lbl" for="tts-engine">voice</label>

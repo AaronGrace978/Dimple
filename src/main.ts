@@ -40,6 +40,16 @@ import {
   ttsEngine,
   ttsFieldLines,
 } from "./tts";
+import { pollGamepad } from "./controls";
+import { canListen, listenOnce, stopListen, wakeKeyboard } from "./listen";
+import {
+  isSteamDeck,
+  loadQuality,
+  qualityTier,
+  resolvedQuality,
+  saveQuality,
+  type QualityId,
+} from "./quality";
 import { Renderer } from "./renderer";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
@@ -67,6 +77,10 @@ const elevenModelSelect = document.querySelector<HTMLSelectElement>("#eleven-mod
 const elevenVoiceSelect = document.querySelector<HTMLSelectElement>("#eleven-voice")!;
 const muteBtn = document.querySelector("#mute-chat")!;
 const minBtn = document.querySelector("#min-chat")!;
+const talkBtn = document.querySelector("#talk-chat")!;
+const openTalk = document.querySelector("#open-talk")!;
+const qualitySelect = document.querySelector<HTMLSelectElement>("#quality")!;
+const helpKeys = document.querySelector("#help-keys")!;
 
 function fail(message: string): never {
   boot.classList.add("hidden");
@@ -207,6 +221,7 @@ function placeChat(x: number, y: number): void {
 }
 
 function restoreChat(): void {
+  if (isSteamDeck() || qualityTier() === 0) return;
   const ui = loadChatUi();
   if (!ui) return;
   placeChat(ui.x, ui.y);
@@ -279,18 +294,93 @@ function bind(): void {
   void refreshModels();
 }
 
-function toggleSettings(): void {
-  settings.classList.toggle("hidden");
-  if (!settings.classList.contains("hidden")) companionInput.focus();
+function applyChrome(): void {
+  const deck = isSteamDeck() || qualityTier() === 0;
+  document.body.classList.toggle("deck", deck);
+  qualitySelect.value = loadQuality();
+  helpKeys.textContent = deck
+    ? "A chat · X talk · Y follow · B back · START settings · STEAM+X keyboard · RS look"
+    : "drag orbit · scroll zoom · C chat · S settings · F follow";
 }
 
-function toggleChat(): void {
-  chatWindow.classList.toggle("hidden");
+function toggleSettings(): void {
+  settings.classList.toggle("hidden");
+  if (!settings.classList.contains("hidden") && !isSteamDeck()) {
+    companionInput.focus();
+  }
+}
+
+function toggleChat(forceOpen = false): void {
+  if (forceOpen) chatWindow.classList.remove("hidden");
+  else chatWindow.classList.toggle("hidden");
   if (!chatWindow.classList.contains("hidden")) {
+    chatWindow.classList.remove("min");
+    minBtn.textContent = "min";
     restoreChat();
     renderChat();
-    if (!chatWindow.classList.contains("min")) chatInput.focus();
+    wakeKeyboard(chatInput);
+  } else {
+    stopListen();
+    talkBtn.classList.remove("hot");
   }
+}
+
+function closePanels(): void {
+  settings.classList.add("hidden");
+  chatWindow.classList.add("hidden");
+  chatInput.blur();
+  stopListen();
+  talkBtn.classList.remove("hot");
+}
+
+function sendChat(text: string): void {
+  const said = text.trim();
+  if (!said || chatting) return;
+  chatInput.value = "";
+  appendChat("you", said);
+  renderChat();
+  chatting = true;
+  void mind
+    .converse(said, presence, performance.now() / 1000, visitor)
+    .then((reply) => {
+      appendChat("dimple", reply);
+      lastSpoken = reply;
+      presence.applyIntent({
+        wish: presence.wish,
+        iso: presence.targetIso,
+        morph: presence.targetMorph,
+        speech: reply,
+        mood: "seek",
+      });
+      renderChat();
+      speakDimple(reply);
+    })
+    .finally(() => {
+      chatting = false;
+    });
+}
+
+function sendTyped(): void {
+  const text = chatInput.value.trim();
+  if (text) sendChat(text);
+  else if (!chatWindow.classList.contains("hidden")) wakeKeyboard(chatInput);
+  else toggleChat(true);
+}
+
+async function startTalk(): Promise<void> {
+  toggleChat(true);
+  if (!canListen()) {
+    wakeKeyboard(chatInput);
+    keyStatus.textContent = "mic off — STEAM+X to type";
+    return;
+  }
+  talkBtn.classList.add("hot");
+  talkBtn.textContent = "…";
+  const said = await listenOnce();
+  talkBtn.classList.remove("hot");
+  talkBtn.textContent = "talk";
+  if (said) sendChat(said);
+  else wakeKeyboard(chatInput);
 }
 
 function attachDrag(
@@ -364,11 +454,26 @@ seedDimple();
 renderChat();
 restoreChat();
 restoreCaption();
+applyChrome();
+renderer.applyQuality();
 attachDrag(chatWindow, document.querySelector("#chat-drag")!, saveChatUi);
 attachDrag(caption, document.querySelector("#caption-drag")!, saveCaptionUi);
 syncMute();
 
+document.querySelector("#open-chat")!.addEventListener("click", () => toggleChat(true));
 document.querySelector("#open-settings")!.addEventListener("click", toggleSettings);
+openTalk.addEventListener("click", () => {
+  void startTalk();
+});
+talkBtn.addEventListener("click", () => {
+  void startTalk();
+});
+qualitySelect.addEventListener("change", () => {
+  saveQuality(qualitySelect.value as QualityId);
+  renderer.applyQuality();
+  applyChrome();
+  keyStatus.textContent = `quality · ${resolvedQuality()}`;
+});
 document.querySelector("#close-settings")!.addEventListener("click", () => {
   settings.classList.add("hidden");
 });
@@ -468,30 +573,7 @@ elevenModelSelect.addEventListener("change", () => setElevenModel(elevenModelSel
 
 document.querySelector("#chat-form")!.addEventListener("submit", (e) => {
   e.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text || chatting) return;
-  chatInput.value = "";
-  appendChat("you", text);
-  renderChat();
-  chatting = true;
-  void mind
-    .converse(text, presence, performance.now() / 1000, visitor)
-    .then((reply) => {
-      appendChat("dimple", reply);
-      lastSpoken = reply;
-      presence.applyIntent({
-        wish: presence.wish,
-        iso: presence.targetIso,
-        morph: presence.targetMorph,
-        speech: reply,
-        mood: "seek",
-      });
-      renderChat();
-      speakDimple(reply);
-    })
-    .finally(() => {
-      chatting = false;
-    });
+  sendTyped();
 });
 
 window.addEventListener("keydown", (e) => {
@@ -506,6 +588,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "f" || e.key === "F") camera.follow = !camera.follow;
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
+  if (e.key === "t" || e.key === "T") void startTalk();
   if (e.key === "l" || e.key === "L") {
     mind.useLlm = !mind.useLlm && hasMind(mind.provider);
     keyStatus.textContent = mind.useLlm
@@ -513,8 +596,7 @@ window.addEventListener("keydown", (e) => {
       : "remote mind off — Dimple local";
   }
   if (e.key === "Escape") {
-    settings.classList.add("hidden");
-    chatWindow.classList.add("hidden");
+    closePanels();
   }
 });
 
@@ -522,6 +604,7 @@ let last = performance.now();
 
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
+  renderer.noteFrame(now - last);
   last = now;
   const time = now / 1000;
 
@@ -534,6 +617,21 @@ function frame(now: number): void {
   presence.applyIntent(intent);
   presence.tick(dt, time);
   camera.tick(presence.pos, dt);
+  pollGamepad(camera, {
+    chatOpen: () => !chatWindow.classList.contains("hidden"),
+    typing,
+    openChat: () => toggleChat(true),
+    closePanels,
+    toggleSettings,
+    toggleFollow: () => {
+      camera.follow = !camera.follow;
+    },
+    talk: () => {
+      void startTalk();
+    },
+    sendTyped,
+    tapCenter: () => placeVisitor(0.5, 0.62),
+  }, dt);
 
   const snap = presence.snapshot();
   const visitorPos: Vec3 = visitor?.pos ?? [0, 0, 0];
@@ -562,7 +660,7 @@ function frame(now: number): void {
         ? "thinking"
         : mind.provider
       : "local";
-  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${remote}`;
+  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${remote} · ${Math.round(renderer.fps)}fps${qualityTier() === 0 ? " · deck" : ""}`;
   if (snap.speech) {
     speechEl.textContent = snap.speech;
     caption.classList.add("on");

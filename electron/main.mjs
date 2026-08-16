@@ -1,8 +1,9 @@
-import { app, BrowserWindow, globalShortcut, shell } from "electron";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, globalShortcut, session, shell } from "electron";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 17321;
@@ -37,6 +38,25 @@ const MIME = {
 
 function distRoot() {
   return path.join(app.getAppPath(), "dist");
+}
+
+function isSteamDeck() {
+  if (process.env.STEAMDECK === "1" || process.env.SteamDeck === "1") return true;
+  if (process.env.SteamGameId || process.env.SteamAppId) {
+    try {
+      const name = readFileSync("/sys/devices/virtual/dmi/id/board_name", "utf8");
+      if (/Jupiter|Galileo/i.test(name)) return true;
+    } catch {
+      /* not a deck board */
+    }
+  }
+  try {
+    const name = readFileSync("/sys/devices/virtual/dmi/id/board_name", "utf8");
+    if (/Jupiter|Galileo/i.test(name)) return true;
+  } catch {
+    /* ignore */
+  }
+  return process.platform === "linux" && existsSync("/home/deck");
 }
 
 function matchProxy(urlPath) {
@@ -80,6 +100,12 @@ function startServer() {
     const server = createServer(async (req, res) => {
       try {
         const urlPath = (req.url ?? "/").split("?")[0];
+        if (urlPath === "/osk") {
+          void shell.openExternal("steam://open/keyboard");
+          res.writeHead(204);
+          res.end();
+          return;
+        }
         const proxied = matchProxy(urlPath);
         if (proxied) {
           await proxyRequest(req, res, proxied.prefix, proxied.target);
@@ -114,29 +140,43 @@ function startServer() {
 
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("use-gl", "angle");
+  app.commandLine.appendSwitch("use-angle", "gl");
+}
 
 let win;
+const deck = isSteamDeck();
 
 async function createWindow() {
   await startServer();
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === "media" || permission === "audioCapture");
+  });
   win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 960,
-    minHeight: 600,
+    minWidth: 640,
+    minHeight: 400,
     title: "Dimple",
     backgroundColor: "#07070a",
     autoHideMenuBar: true,
+    fullscreen: deck,
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
     },
   });
   win.removeMenu();
-  await win.loadURL(`http://127.0.0.1:${PORT}/`);
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+  const url = deck
+    ? `http://127.0.0.1:${PORT}/?deck=1`
+    : `http://127.0.0.1:${PORT}/`;
+  await win.loadURL(url);
+  win.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+    void shell.openExternal(openUrl);
     return { action: "deny" };
   });
 }

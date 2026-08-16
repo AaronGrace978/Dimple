@@ -1,5 +1,12 @@
 import { loc, program } from "./gl";
 import type { Vec3 } from "./math";
+import {
+  dprCap,
+  qualityTier,
+  startScale,
+  targetFrameMs,
+  type QualityTier,
+} from "./quality";
 import vertSrc from "./shaders/vert.glsl?raw";
 import fragSrc from "./shaders/frag.glsl?raw";
 
@@ -38,6 +45,7 @@ type Uniforms = {
   uTrail1: WebGLUniformLocation;
   uTrail2: WebGLUniformLocation;
   uTrailW: WebGLUniformLocation;
+  uQuality: WebGLUniformLocation;
 };
 
 export class Renderer {
@@ -46,13 +54,26 @@ export class Renderer {
   private readonly vao: WebGLVertexArrayObject;
   private readonly u: Uniforms;
   private dpr = 1;
+  private scale = 1;
+  private emaMs = 16;
+  fps = 60;
+  tier: QualityTier = 2;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext("webgl2", {
-      antialias: false,
-      alpha: false,
-      powerPreference: "high-performance",
-    });
+    const gl =
+      canvas.getContext("webgl2", {
+        antialias: false,
+        alpha: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "high-performance",
+        desynchronized: true,
+      }) ??
+      canvas.getContext("webgl2", {
+        antialias: false,
+        alpha: false,
+        powerPreference: "high-performance",
+      });
     if (!gl) throw new Error("WebGL2 is required to enter the field.");
     this.gl = gl;
     this.prog = program(gl, vertSrc, fragSrc);
@@ -76,13 +97,30 @@ export class Renderer {
       uTrail1: loc(gl, this.prog, "uTrail1"),
       uTrail2: loc(gl, this.prog, "uTrail2"),
       uTrailW: loc(gl, this.prog, "uTrailW"),
+      uQuality: loc(gl, this.prog, "uQuality"),
     };
+    this.applyQuality();
+  }
+
+  applyQuality(): void {
+    this.tier = qualityTier();
+    this.scale = startScale(this.tier);
+    this.emaMs = targetFrameMs(this.tier);
+  }
+
+  noteFrame(ms: number): void {
+    const clamped = Math.min(80, Math.max(6, ms));
+    this.emaMs = this.emaMs * 0.9 + clamped * 0.1;
+    this.fps = 1000 / this.emaMs;
+    const target = targetFrameMs(this.tier);
+    if (this.emaMs > target * 1.12) this.scale = Math.max(0.48, this.scale * 0.97);
+    else if (this.emaMs < target * 0.78) this.scale = Math.min(1, this.scale * 1.015);
   }
 
   resize(): void {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const w = Math.max(1, Math.floor(this.canvas.clientWidth * this.dpr));
-    const h = Math.max(1, Math.floor(this.canvas.clientHeight * this.dpr));
+    this.dpr = Math.min(window.devicePixelRatio || 1, dprCap(this.tier));
+    const w = Math.max(1, Math.floor(this.canvas.clientWidth * this.dpr * this.scale));
+    const h = Math.max(1, Math.floor(this.canvas.clientHeight * this.dpr * this.scale));
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
       this.canvas.height = h;
@@ -131,6 +169,7 @@ export class Renderer {
     gl.uniform3f(u.uTrail1, state.trail1[0], state.trail1[1], state.trail1[2]);
     gl.uniform3f(u.uTrail2, state.trail2[0], state.trail2[1], state.trail2[2]);
     gl.uniform3f(u.uTrailW, state.trailW[0], state.trailW[1], state.trailW[2]);
+    gl.uniform1f(u.uQuality, this.tier);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }

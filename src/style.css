@@ -27,6 +27,7 @@ body {
   height: 100%;
   display: block;
   cursor: crosshair;
+  object-fit: fill;
 }
 
 #hud {
@@ -398,4 +399,65 @@ button.ghost {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+.talk-btn {
+  background: var(--accent);
+  color: #07110e;
+  min-width: 64px;
+}
+
+.talk-btn.hot {
+  animation: pulse-talk 0.9s ease-in-out infinite;
+}
+
+@keyframes pulse-talk {
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+body.deck .icon-btn,
+body.deck button {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+body.deck .hud-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+body.deck #chat-window {
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  top: auto;
+  width: auto;
+  height: min(52vh, 420px);
+  background: rgba(8, 10, 16, 0.72);
+}
+
+body.deck #chat-form {
+  padding: 10px;
+  gap: 8px;
+}
+
+body.deck #chat-input {
+  font-size: 16px;
+  padding: 12px 12px;
+  min-height: 44px;
+}
+
+body.deck #settings {
+  left: 10px;
+  right: 10px;
+  top: 64px;
+  width: auto;
+  max-height: calc(100vh - 80px);
+}
+
+body.deck footer {
+  font-size: 11px;
 }

@@ -19,6 +19,7 @@ uniform vec3 uTrail0;
 uniform vec3 uTrail1;
 uniform vec3 uTrail2;
 uniform vec3 uTrailW;
+uniform float uQuality;
 
 out vec4 fragColor;
 
@@ -49,7 +50,9 @@ float vnoise(vec3 x) {
 float fbm(vec3 p) {
   float a = 0.5;
   float s = 0.0;
+  int oct = uQuality < 0.5 ? 2 : 4;
   for (int i = 0; i < 4; i++) {
+    if (i >= oct) break;
     s += a * vnoise(p);
     p = p * 2.03 + vec3(1.7, 9.2, 2.3);
     a *= 0.5;
@@ -229,7 +232,9 @@ vec3 calcNormal(vec3 p) {
 float calcAO(vec3 p, vec3 n) {
   float occ = 0.0;
   float sca = 1.0;
+  int taps = uQuality < 0.5 ? 2 : (uQuality < 1.5 ? 3 : 5);
   for (int i = 0; i < 5; i++) {
+    if (i >= taps) break;
     float h = 0.01 + 0.12 * float(i);
     float d = map(p + n * h).x;
     occ += (h - d) * sca;
@@ -241,7 +246,9 @@ float calcAO(vec3 p, vec3 n) {
 float softShadow(vec3 ro, vec3 rd, float mint, float maxt) {
   float res = 1.0;
   float t = mint;
+  int taps = uQuality < 0.5 ? 8 : (uQuality < 1.5 ? 14 : 24);
   for (int i = 0; i < 24; i++) {
+    if (i >= taps) break;
     float h = map(ro + rd * t).x;
     res = min(res, 16.0 * h / t);
     t += clamp(h, 0.02, 0.35);
@@ -255,16 +262,20 @@ vec3 sky(vec3 rd) {
   col += vec3(0.1, 0.04, 0.14) * pow(smoothstep(0.4, -0.05, rd.y), 2.0);
   float n = fbm(rd * 3.4);
   col += vec3(0.14, 0.05, 0.24) * pow(n, 3.0) * smoothstep(-0.15, 0.45, rd.y);
-  col += vec3(0.04, 0.09, 0.2) * pow(fbm(rd * 6.2 + 8.0), 4.0);
-  float band = exp(-pow(rd.x * 0.4 + rd.z * 0.18 - rd.y * 0.12, 2.0) * 16.0);
-  col += vec3(0.2, 0.18, 0.32) * band * fbm(rd * 11.0);
+  if (uQuality > 0.5) {
+    col += vec3(0.04, 0.09, 0.2) * pow(fbm(rd * 6.2 + 8.0), 4.0);
+    float band = exp(-pow(rd.x * 0.4 + rd.z * 0.18 - rd.y * 0.12, 2.0) * 16.0);
+    col += vec3(0.2, 0.18, 0.32) * band * fbm(rd * 11.0);
+  }
   col += vec3(0.85, 0.9, 1.0) * pow(hash(rd.xy * 220.0), 80.0) * smoothstep(-0.05, 0.4, rd.y);
   col += vec3(0.65, 0.78, 1.0) * pow(hash(rd.yz * 90.0 + 3.1), 140.0) * 1.3;
   vec3 pd = normalize(vec3(-0.55, 0.32, 0.62));
   float ang = length(rd - pd);
   col += vec3(0.42, 0.2, 0.55) * smoothstep(0.11, 0.078, ang);
   col += vec3(0.9, 0.84, 1.0) * smoothstep(0.082, 0.068, ang) * 0.4;
-  col += vec3(0.04, 0.16, 0.12) * pow(fbm(rd * 2.2 + vec3(uTime * 0.03, 0.0, 0.0)), 5.0) * smoothstep(0.0, 0.45, rd.y);
+  if (uQuality > 0.5) {
+    col += vec3(0.04, 0.16, 0.12) * pow(fbm(rd * 2.2 + vec3(uTime * 0.03, 0.0, 0.0)), 5.0) * smoothstep(0.0, 0.45, rd.y);
+  }
   return col;
 }
 
@@ -284,16 +295,20 @@ void main() {
   vec2 hit = vec2(1e5, 0.0);
   bool found = false;
 
+  int maxSteps = uQuality < 0.5 ? 48 : (uQuality < 1.5 ? 64 : 88);
   for (int i = 0; i < 88; i++) {
+    if (i >= maxSteps) break;
     vec3 p = ro + rd * t;
     hit = map(p);
     float da = mapAgent(p);
     glow += 0.018 / (0.012 + da * da);
-    float dl = mapLanterns(p);
-    lampGlow += 0.012 / (0.01 + dl * dl);
-    vec3 pr = p - vec3(0.0, 1.15, -4.55);
-    float dp = sdTorusXY(pr, vec2(0.95, 0.07));
-    portalGlow += 0.01 / (0.02 + dp * dp);
+    if (uQuality > 0.5 || mod(float(i), 2.0) < 0.5) {
+      float dl = mapLanterns(p);
+      lampGlow += 0.012 / (0.01 + dl * dl);
+      vec3 pr = p - vec3(0.0, 1.15, -4.55);
+      float dp = sdTorusXY(pr, vec2(0.95, 0.07));
+      portalGlow += 0.01 / (0.02 + dp * dp);
+    }
     if (uVisitorOn > 0.5) {
       float dv = mapVisitor(p);
       visGlow += 0.01 / (0.02 + dv * dv);
@@ -366,20 +381,24 @@ void main() {
 
     if ((water || (hit.y < 1.5 && p.y < 0.08)) && lanternHit > 0.12) {
       vec3 rrd = reflect(rd, n);
-      float rt = 0.03;
       vec3 rcol = sky(rrd);
-      for (int i = 0; i < 28; i++) {
-        vec3 rp = p + rrd * rt;
-        float h = map(rp).x;
-        if (h < 0.002) {
-          vec3 rn = calcNormal(rp);
-          rcol = vec3(0.07, 0.08, 0.1) * (0.2 + 0.8 * clamp(dot(rn, l), 0.0, 1.0));
-          if (mapAgent(rp) < 0.05) rcol += hsv(uAgentHue, 0.4, 1.0) * 0.9;
-          if (mapLanterns(rp) < 0.12) rcol += vec3(1.0, 0.7, 0.35);
-          break;
+      if (uQuality > 0.45) {
+        float rt = 0.03;
+        int rsteps = uQuality < 1.5 ? 12 : 28;
+        for (int i = 0; i < 28; i++) {
+          if (i >= rsteps) break;
+          vec3 rp = p + rrd * rt;
+          float h = map(rp).x;
+          if (h < 0.002) {
+            vec3 rn = calcNormal(rp);
+            rcol = vec3(0.07, 0.08, 0.1) * (0.2 + 0.8 * clamp(dot(rn, l), 0.0, 1.0));
+            if (mapAgent(rp) < 0.05) rcol += hsv(uAgentHue, 0.4, 1.0) * 0.9;
+            if (mapLanterns(rp) < 0.12) rcol += vec3(1.0, 0.7, 0.35);
+            break;
+          }
+          rt += h;
+          if (rt > 16.0) break;
         }
-        rt += h;
-        if (rt > 16.0) break;
       }
       col = mix(col, rcol, water ? 0.55 + 0.3 * fre : 0.2 + 0.22 * fre);
     }
@@ -394,21 +413,25 @@ void main() {
   float fog = 1.0 - exp(-0.0007 * t * t);
   col = mix(col, sky(rd), found ? fog : 0.0);
 
-  float cloud = 0.0;
-  float ct = 3.5;
-  for (int i = 0; i < 16; i++) {
-    vec3 cp = ro + rd * ct;
-    if (cp.y > 2.1 && cp.y < 6.0) {
-      float dens = fbm(cp * 0.27 + vec3(uTime * 0.03, 0.0, uTime * 0.015));
-      dens = smoothstep(0.52, 0.78, dens);
-      dens *= smoothstep(2.1, 2.9, cp.y) * smoothstep(6.0, 4.5, cp.y);
-      cloud += dens * 0.09;
+  if (uQuality > 0.5) {
+    float cloud = 0.0;
+    float ct = 3.5;
+    int csteps = uQuality < 1.5 ? 8 : 16;
+    for (int i = 0; i < 16; i++) {
+      if (i >= csteps) break;
+      vec3 cp = ro + rd * ct;
+      if (cp.y > 2.1 && cp.y < 6.0) {
+        float dens = fbm(cp * 0.27 + vec3(uTime * 0.03, 0.0, uTime * 0.015));
+        dens = smoothstep(0.52, 0.78, dens);
+        dens *= smoothstep(2.1, 2.9, cp.y) * smoothstep(6.0, 4.5, cp.y);
+        cloud += dens * 0.09;
+      }
+      ct += 0.52;
     }
-    ct += 0.52;
+    float cloudAmt = clamp(cloud, 0.0, 0.72) * mix(1.0, smoothstep(4.0, 14.0, t), found ? 1.0 : 0.0);
+    if (!found) cloudAmt = clamp(cloud, 0.0, 0.72);
+    col = mix(col, vec3(0.62, 0.66, 0.82), cloudAmt * 0.85);
   }
-  float cloudAmt = clamp(cloud, 0.0, 0.72) * mix(1.0, smoothstep(4.0, 14.0, t), found ? 1.0 : 0.0);
-  if (!found) cloudAmt = clamp(cloud, 0.0, 0.72);
-  col = mix(col, vec3(0.62, 0.66, 0.82), cloudAmt * 0.85);
 
   col *= 0.28 + 0.72 * pow(16.0 * gl_FragCoord.x / uResolution.x * gl_FragCoord.y / uResolution.y *
     (1.0 - gl_FragCoord.x / uResolution.x) * (1.0 - gl_FragCoord.y / uResolution.y), 0.18);

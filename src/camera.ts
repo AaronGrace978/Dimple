@@ -50,6 +50,15 @@ export class OrbitCamera {
     );
   }
 
+  look(dx: number, dy: number): void {
+    this.yaw -= dx;
+    this.pitch = clamp(this.pitch + dy, 0.08, 1.35);
+  }
+
+  zoomBy(factor: number): void {
+    this.dist = clamp(this.dist * factor, 2.4, 16);
+  }
+
   tick(agent: Vec3, dt: number): void {
     const aim: Vec3 = this.follow ? agent : this.target;
     this.target = [
