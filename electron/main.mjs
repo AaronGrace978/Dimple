@@ -144,6 +144,8 @@ app.commandLine.appendSwitch("enable-zero-copy");
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("use-gl", "angle");
   app.commandLine.appendSwitch("use-angle", "gl");
+  app.commandLine.appendSwitch("no-sandbox");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
 }
 
 let win;
