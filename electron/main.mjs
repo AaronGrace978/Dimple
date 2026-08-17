@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -151,6 +152,29 @@ app.commandLine.appendSwitch("ignore-gpu-blocklist");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+app.commandLine.appendSwitch("force_high_performance_gpu");
+if (process.platform === "win32") {
+  app.commandLine.appendSwitch("use-angle", "d3d11");
+  try {
+    spawn(
+      "reg",
+      [
+        "add",
+        "HKCU\\Software\\Microsoft\\DirectX\\UserGpuPreferences",
+        "/v",
+        process.execPath,
+        "/t",
+        "REG_SZ",
+        "/d",
+        "GpuPreference=2;",
+        "/f",
+      ],
+      { windowsHide: true, stdio: "ignore" },
+    );
+  } catch {
+    /* first launch still has Chromium's force_high_performance_gpu */
+  }
+}
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("no-sandbox");
   app.commandLine.appendSwitch("disable-gpu-sandbox");

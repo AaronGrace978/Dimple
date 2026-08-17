@@ -18,6 +18,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   shortcutName: Dimple
   artifactName: Dimple-${version}-windows-setup.${ext}
+  include: build/installer.nsh
   packElevateHelper: false
   differentialPackage: false
 portable:
