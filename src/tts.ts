@@ -1,4 +1,4 @@
-import { playBytes, stopPcm, unlockAudio } from "./audio";
+import { playBytes, speechGeneration, stopPcm, unlockAudio } from "./audio";
 import { shapeLine, voiceForMood } from "./moodVoice";
 import { isSteamDeck } from "./quality";
 import { speakLocal } from "./voice";
@@ -111,22 +111,29 @@ export async function listElevenVoices(key = elevenKey()): Promise<{ id: string;
   }
 }
 
+function stillThisUtterance(gen: number): boolean {
+  return ttsEnabled() && gen === speechGeneration();
+}
+
 export async function speak(text: string, mood = "wander"): Promise<void> {
   const line = shapeLine(text, mood);
   if (!line || !ttsEnabled()) return;
   stopSpeak();
+  const gen = speechGeneration();
   await unlockAudio();
+  if (!stillThisUtterance(gen)) return;
   const shape = voiceForMood(mood);
 
   const engine = ttsEngine();
   if (engine === "elevenlabs" && elevenKey()) {
     try {
-      await speakEleven(line, shape);
+      await speakEleven(line, shape, gen);
       return;
     } catch {
       /* Deck / missing key / network — fall through */
     }
   }
+  if (!stillThisUtterance(gen)) return;
   if (engine !== "browser") {
     try {
       await speakLocal(line, { speed: shape.speed, pitch: shape.pitch, warmth: shape.warmth });
@@ -135,6 +142,7 @@ export async function speak(text: string, mood = "wander"): Promise<void> {
       /* fall through */
     }
   }
+  if (!stillThisUtterance(gen)) return;
   if (speakBrowser(line, shape)) return;
   try {
     await speakLocal(line, { speed: shape.speed, pitch: shape.pitch, warmth: shape.warmth });
@@ -162,6 +170,7 @@ function speakBrowser(text: string, shape = voiceForMood("wander")): boolean {
 async function speakEleven(
   text: string,
   shape = voiceForMood("wander"),
+  gen = speechGeneration(),
 ): Promise<void> {
   const res = await fetch(
     `/p/elevenlabs/v1/text-to-speech/${encodeURIComponent(elevenVoice())}?output_format=mp3_44100_128`,
@@ -184,5 +193,6 @@ async function speakEleven(
     },
   );
   if (!res.ok) throw new Error("elevenlabs failed");
+  if (!stillThisUtterance(gen)) return;
   await playBytes(await res.arrayBuffer());
 }

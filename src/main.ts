@@ -101,6 +101,8 @@ const elevenFields = document.querySelector("#eleven-fields")!;
 const localFields = document.querySelector("#local-fields")!;
 const localVoiceSelect = document.querySelector<HTMLSelectElement>("#local-voice")!;
 const muteBtn = document.querySelector("#mute-chat")!;
+const hudMute = document.querySelector("#hud-mute")!;
+const guide = document.querySelector("#guide")!;
 const minBtn = document.querySelector("#min-chat")!;
 const talkBtn = document.querySelector("#talk-chat")!;
 const openTalk = document.querySelector("#open-talk")!;
@@ -364,7 +366,23 @@ function restoreChat(): void {
 }
 
 function syncMute(): void {
-  muteBtn.textContent = ttsEnabled() ? "voice" : "muted";
+  const on = ttsEnabled();
+  muteBtn.textContent = on ? "voice" : "muted";
+  hudMute.textContent = on ? "mute" : "muted";
+  hudMute.classList.toggle("quiet", !on);
+  ttsOn.checked = on;
+  if (!on) caption.classList.remove("on");
+}
+
+function toggleMute(): void {
+  setTtsEnabled(!ttsEnabled());
+  syncMute();
+}
+
+function toggleGuide(): void {
+  const opening = guide.classList.contains("hidden");
+  guide.classList.toggle("hidden");
+  if (opening) settings.classList.add("hidden");
 }
 
 function speakDimple(text: string, fromField = false): void {
@@ -462,8 +480,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "HOLD X/L1/L2 talk · HOLD R1+stick push · D-pad up pet · A chat"
-    : "drag orbit · click pet · drag Dimple to push · HOLD T talk · P pet";
+    ? "HOLD X/L1/L2 talk · D-pad left mute · D-pad right guide · A chat"
+    : "M mute · H guide · click pet · HOLD T talk · P pet";
 }
 
 function qualityNote(): string {
@@ -477,8 +495,9 @@ function qualityNote(): string {
 
 function toggleSettings(): void {
   settings.classList.toggle("hidden");
-  if (!settings.classList.contains("hidden") && !isSteamDeck()) {
-    companionInput.focus();
+  if (!settings.classList.contains("hidden")) {
+    guide.classList.add("hidden");
+    if (!isSteamDeck()) companionInput.focus();
   }
 }
 
@@ -498,6 +517,7 @@ function toggleChat(forceOpen = false, opts?: { focus?: boolean }): void {
 
 function closePanels(): void {
   settings.classList.add("hidden");
+  guide.classList.add("hidden");
   chatWindow.classList.add("hidden");
   chatInput.blur();
   stopListen();
@@ -697,6 +717,9 @@ syncMute();
 
 document.querySelector("#open-chat")!.addEventListener("click", () => toggleChat(true));
 document.querySelector("#open-settings")!.addEventListener("click", toggleSettings);
+document.querySelector("#open-guide")!.addEventListener("click", toggleGuide);
+document.querySelector("#close-guide")!.addEventListener("click", () => guide.classList.add("hidden"));
+hudMute.addEventListener("click", toggleMute);
 bindPtt(openTalk as HTMLElement);
 bindPtt(talkBtn as HTMLElement);
 qualitySelect.addEventListener("change", () => {
@@ -725,12 +748,7 @@ minBtn.addEventListener("click", () => {
   minBtn.textContent = chatWindow.classList.contains("min") ? "max" : "min";
   saveChatUi();
 });
-muteBtn.addEventListener("click", () => {
-  setTtsEnabled(!ttsEnabled());
-  ttsOn.checked = ttsEnabled();
-  syncMute();
-  if (!ttsEnabled()) stopSpeak();
-});
+muteBtn.addEventListener("click", toggleMute);
 
 companionInput.addEventListener("change", () => {
   setCompanion(companionInput.value);
@@ -824,6 +842,7 @@ window.addEventListener("keydown", (e) => {
   if (typing()) {
     if (e.key === "Escape") {
       settings.classList.add("hidden");
+      guide.classList.add("hidden");
       chatWindow.classList.add("hidden");
       chatInput.blur();
     }
@@ -832,6 +851,8 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "f" || e.key === "F") camera.follow = !camera.follow;
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
+  if (e.key === "m" || e.key === "M") toggleMute();
+  if (e.key === "h" || e.key === "H" || e.key === "?") toggleGuide();
   if (e.key === "t" || e.key === "T" || e.key === "x" || e.key === "X") void beginPtt();
   if (e.key === "p" || e.key === "P") petDimple();
   if (e.key === "l" || e.key === "L") {
@@ -939,6 +960,8 @@ function frame(now: number): void {
     },
     tapCenter: () => placeVisitor(0.5, 0.62),
     pet: petDimple,
+    toggleMute,
+    toggleGuide,
     push: (lx, ly, gx, gy) => {
       const right = camera.flatRight();
       const fwd = camera.flatFwd();
@@ -1056,12 +1079,14 @@ function frame(now: number): void {
   statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${growthLabel(snap.growth)} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}${guestNote}`;
   if (snap.speech) {
     speechEl.textContent = snap.speech;
-    caption.classList.add("on");
+    caption.classList.toggle("on", ttsEnabled());
     if (snap.speech !== lastSpoken) {
       lastSpoken = snap.speech;
-      appendChat("dimple", snap.speech);
-      if (!chatWindow.classList.contains("hidden")) renderChat();
-      speakDimple(snap.speech, true);
+      if (ttsEnabled()) {
+        appendChat("dimple", snap.speech);
+        if (!chatWindow.classList.contains("hidden")) renderChat();
+        speakDimple(snap.speech, true);
+      }
     }
   } else {
     caption.classList.remove("on");

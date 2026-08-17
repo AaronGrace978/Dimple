@@ -1,4 +1,4 @@
-import { playPcm } from "./audio";
+import { playPcm, speechGeneration } from "./audio";
 import { initKokoro, onSpeechStatus, workerSpeak } from "./speechHub";
 
 const VOICE_KEY = "raymarch_kokoro_voice";
@@ -61,8 +61,13 @@ export async function speakLocal(
 ): Promise<void> {
   const line = text.trim();
   if (!line) return;
+  const gen = speechGeneration();
   emit("speaking…");
   const audio = await workerSpeak(line, localVoice(), opts?.speed ?? 1.05);
+  if (gen !== speechGeneration()) {
+    emit("voice ready");
+    return;
+  }
   await playPcm(audio.pcm, audio.sampleRate, {
     rate: opts?.pitch ?? 1,
     warmth: opts?.warmth ?? 0.65,

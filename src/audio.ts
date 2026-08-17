@@ -1,6 +1,18 @@
 let ctx: AudioContext | null = null;
 let playing: AudioBufferSourceNode | null = null;
+let speechGain: GainNode | null = null;
 let speaking = false;
+/** Bumped on every hush so in-flight Kokoro cannot start playback. */
+let speechGen = 0;
+
+export function speechGeneration(): number {
+  return speechGen;
+}
+
+export function bumpSpeechGeneration(): number {
+  speechGen += 1;
+  return speechGen;
+}
 
 export function isSpeaking(): boolean {
   return speaking || playing !== null;
@@ -23,7 +35,17 @@ export async function unlockAudio(): Promise<AudioContext> {
   return c;
 }
 
-export function stopPcm(): void {
+function hushGain(): void {
+  if (!speechGain || !ctx || ctx.state === "closed") return;
+  try {
+    speechGain.gain.cancelScheduledValues(ctx.currentTime);
+    speechGain.gain.setValueAtTime(0, ctx.currentTime);
+  } catch {
+    /* context gone */
+  }
+}
+
+function cutSource(): void {
   try {
     playing?.stop();
   } catch {
@@ -33,19 +55,31 @@ export function stopPcm(): void {
   speaking = false;
 }
 
+export function stopPcm(): void {
+  bumpSpeechGeneration();
+  hushGain();
+  cutSource();
+}
+
 export async function playPcm(
   pcm: Float32Array,
   sampleRate: number,
   opts?: { rate?: number; warmth?: number },
 ): Promise<void> {
+  const gen = speechGeneration();
   const c = await unlockAudio();
-  stopPcm();
+  if (gen !== speechGeneration()) return;
+  cutSource();
   const copy = new Float32Array(pcm);
   const buffer = c.createBuffer(1, copy.length, sampleRate);
   buffer.copyToChannel(copy, 0);
   const rate = Math.min(1.45, Math.max(0.7, opts?.rate ?? 1));
   const warmth = Math.min(1, Math.max(0, opts?.warmth ?? 0.65));
   await new Promise<void>((resolve, reject) => {
+    if (gen !== speechGeneration()) {
+      resolve();
+      return;
+    }
     const src = c.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = rate;
@@ -53,12 +87,17 @@ export async function playPcm(
     filter.type = "lowpass";
     filter.frequency.value = 1800 + warmth * 9000;
     filter.Q.value = 0.55;
+    const g = c.createGain();
+    g.gain.value = 1;
     src.connect(filter);
-    filter.connect(c.destination);
+    filter.connect(g);
+    g.connect(c.destination);
     playing = src;
+    speechGain = g;
     speaking = true;
     src.onended = () => {
       if (playing === src) playing = null;
+      if (speechGain === g) speechGain = null;
       speaking = false;
       resolve();
     };
@@ -66,6 +105,7 @@ export async function playPcm(
       src.start();
     } catch (err) {
       playing = null;
+      if (speechGain === g) speechGain = null;
       speaking = false;
       reject(err);
     }
@@ -109,17 +149,29 @@ export function chirp(kind: "pet" | "wake" | "sleep"): void {
 }
 
 export async function playBytes(data: ArrayBuffer): Promise<void> {
+  const gen = speechGeneration();
   const c = await unlockAudio();
-  stopPcm();
+  if (gen !== speechGeneration()) return;
   const buffer = await c.decodeAudioData(data.slice(0));
+  if (gen !== speechGeneration()) return;
+  cutSource();
   await new Promise<void>((resolve, reject) => {
+    if (gen !== speechGeneration()) {
+      resolve();
+      return;
+    }
     const src = c.createBufferSource();
     src.buffer = buffer;
-    src.connect(c.destination);
+    const g = c.createGain();
+    g.gain.value = 1;
+    src.connect(g);
+    g.connect(c.destination);
     playing = src;
+    speechGain = g;
     speaking = true;
     src.onended = () => {
       if (playing === src) playing = null;
+      if (speechGain === g) speechGain = null;
       speaking = false;
       resolve();
     };
@@ -127,6 +179,7 @@ export async function playBytes(data: ArrayBuffer): Promise<void> {
       src.start();
     } catch (err) {
       playing = null;
+      if (speechGain === g) speechGain = null;
       speaking = false;
       reject(err);
     }

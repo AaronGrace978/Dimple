@@ -21,6 +21,8 @@
         <div class="hud-right">
           <div id="stats" class="mono">iso 0.40 · wander</div>
           <div class="hud-actions">
+            <button type="button" id="hud-mute" class="icon-btn">mute</button>
+            <button type="button" id="open-guide" class="icon-btn">guide</button>
             <button type="button" id="open-chat" class="icon-btn">chat</button>
             <button type="button" id="open-talk" class="icon-btn">talk</button>
             <button type="button" id="open-caption" class="icon-btn">line</button>
@@ -133,6 +135,38 @@
         <button type="button" id="close-settings" class="ghost">close</button>
       </div>
       <p id="key-status" class="mono"></p>
+    </div>
+
+    <div id="guide" class="hidden" role="dialog" aria-label="Guide">
+      <h2>Guide</h2>
+      <p>
+        Mute is top-right. It hushes his voice <em>and</em> the wander lines that
+        used to pile into chat. He still answers when you talk.
+      </p>
+      <h3>Mouse / keyboard</h3>
+      <ul>
+        <li><strong>M</strong> mute / unmute</li>
+        <li><strong>H</strong> or <strong>?</strong> this guide</li>
+        <li><strong>click Dimple</strong> pet · <strong>drag him</strong> push the field</li>
+        <li><strong>click floor</strong> toss a play pebble</li>
+        <li><strong>HOLD T</strong> talk · <strong>C</strong> chat · <strong>S</strong> settings · <strong>F</strong> follow · <strong>P</strong> pet</li>
+      </ul>
+      <h3>Steam Deck</h3>
+      <ul>
+        <li><strong>HOLD X / L1 / L2</strong> talk (chat stays closed)</li>
+        <li><strong>HOLD R1 + left stick</strong> push Dimple</li>
+        <li><strong>D-pad up</strong> pet · <strong>D-pad left</strong> mute · <strong>D-pad right</strong> guide</li>
+        <li><strong>A</strong> chat · <strong>Y</strong> follow · <strong>B</strong> back · <strong>START</strong> settings</li>
+      </ul>
+      <h3>Quiet</h3>
+      <ul>
+        <li>Settings → uncheck <strong>Dimple speaks</strong> (same as mute)</li>
+        <li><strong>also speak field lines</strong> is off unless you want wander voice</li>
+        <li><strong>the field sings</strong> is the pad, not him talking — uncheck if you want silence</li>
+      </ul>
+      <div class="row">
+        <button type="button" id="close-guide">got it</button>
+      </div>
     </div>
 
     <div id="boot">waking Dimple…</div>

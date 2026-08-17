@@ -14,6 +14,10 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2.1 — mute means mute
+
+Mute (HUD, chat **voice**, **M**, D-pad left) now cuts Kokoro mid-sentence. In-flight speech never starts after you hush. Wander lines stay out of chat while muted. He still answers in text when you talk. **Guide** is top-right (**H** / **?** / D-pad right).
+
 ## 0.2 — the field remembers
 
 - **Emotional memory.** Fear and joy stain the SDF. Monoliths lean away from scare spots. Crystals dim or bloom. The ground itself warps.
@@ -38,7 +42,9 @@ New field systems are quality-gated: Deck keeps the 40 fps budget (fewer stains,
 | **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
 | **D-pad up** | Pet Dimple |
-| **B** | Close chat / settings |
+| **D-pad left** | Mute / unmute (cuts him off now) |
+| **D-pad right** | Open the in-app guide |
+| **B** | Close chat / settings / guide |
 | **START** | Settings |
 | **SELECT** | Chat |
 | **Right stick** | Look |
