@@ -23,6 +23,7 @@
           <div class="hud-actions">
             <button type="button" id="hud-mute" class="icon-btn">mute</button>
             <button type="button" id="open-guide" class="icon-btn">guide</button>
+            <button type="button" id="open-map" class="icon-btn">map</button>
             <button type="button" id="open-chat" class="icon-btn">chat</button>
             <button type="button" id="open-talk" class="icon-btn">talk</button>
             <button type="button" id="open-caption" class="icon-btn">line</button>
@@ -32,10 +33,19 @@
       </header>
 
       <footer>
-        <span>click Dimple to pet · drag him to push · walk the trails</span>
+        <span>click Dimple to pet · nest is base · N map</span>
         <span class="keys" id="help-keys">drag orbit · scroll zoom · C chat · S settings · F follow</span>
       </footer>
     </div>
+
+    <aside id="field-map" aria-label="Field map">
+      <div class="map-head">
+        <span class="mono">field</span>
+        <button type="button" id="expand-map" class="icon-btn">open</button>
+      </div>
+      <canvas id="minimap" width="220" height="220"></canvas>
+      <p class="map-legend mono">teal dimple · pink BASE · you are the wedge</p>
+    </aside>
 
     <div id="thoughts" aria-hidden="true"></div>
 
@@ -146,6 +156,7 @@
       <h3>Mouse / keyboard</h3>
       <ul>
         <li><strong>M</strong> mute / unmute</li>
+        <li><strong>N</strong> field map (BASE is the nest)</li>
         <li><strong>H</strong> or <strong>?</strong> this guide</li>
         <li><strong>click Dimple</strong> pet · <strong>drag him</strong> push the field</li>
         <li><strong>click floor</strong> toss a play pebble</li>
@@ -156,7 +167,13 @@
         <li><strong>HOLD X / L1 / L2</strong> talk (chat stays closed)</li>
         <li><strong>HOLD R1 + left stick</strong> push Dimple</li>
         <li><strong>D-pad up</strong> pet · <strong>D-pad left</strong> mute · <strong>D-pad right</strong> guide</li>
-        <li><strong>A</strong> chat · <strong>Y</strong> follow · <strong>B</strong> back · <strong>START</strong> settings</li>
+        <li><strong>A</strong> chat · <strong>Y</strong> follow · <strong>B</strong> back · <strong>START</strong> settings · <strong>SELECT</strong> map</li>
+      </ul>
+      <h3>Home</h3>
+      <ul>
+        <li>Northeast of the pool: three dimple-trees and a <strong>nest</strong>. That is <strong>BASE</strong> on the map.</li>
+        <li>Say <strong>sleep</strong>, <strong>bed</strong>, <strong>nest</strong>, or <strong>go home</strong> and he goes there.</li>
+        <li>Leave him alone and he walks back to the nest to rest.</li>
       </ul>
       <h3>Quiet</h3>
       <ul>

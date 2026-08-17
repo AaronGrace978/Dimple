@@ -26,6 +26,7 @@ import {
   setPortalOn,
 } from "./portal";
 import { mapWorld } from "./sdf";
+import { drawFieldMap } from "./map";
 import {
   PROVIDERS,
   clearKey,
@@ -111,6 +112,9 @@ const helpKeys = document.querySelector("#help-keys")!;
 const fieldSingsEl = document.querySelector<HTMLInputElement>("#field-sings")!;
 const portalOnEl = document.querySelector<HTMLInputElement>("#portal-on")!;
 const thoughtsEl = document.querySelector<HTMLElement>("#thoughts")!;
+const fieldMap = document.querySelector("#field-map")!;
+const minimap = document.querySelector<HTMLCanvasElement>("#minimap")!;
+const expandMap = document.querySelector("#expand-map")!;
 
 function fail(message: string): never {
   boot.classList.add("hidden");
@@ -382,7 +386,11 @@ function toggleMute(): void {
 function toggleGuide(): void {
   const opening = guide.classList.contains("hidden");
   guide.classList.toggle("hidden");
-  if (opening) settings.classList.add("hidden");
+  if (opening) {
+    settings.classList.add("hidden");
+    fieldMap.classList.remove("big");
+    expandMap.textContent = "open";
+  }
 }
 
 function speakDimple(text: string, fromField = false): void {
@@ -480,8 +488,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "HOLD X/L1/L2 talk · D-pad left mute · D-pad right guide · A chat"
-    : "M mute · H guide · click pet · HOLD T talk · P pet";
+    ? "HOLD X/L1/L2 talk · SELECT map · D-pad left mute · A chat"
+    : "M mute · N map · H guide · click pet · HOLD T talk · P pet";
 }
 
 function qualityNote(): string {
@@ -497,6 +505,8 @@ function toggleSettings(): void {
   settings.classList.toggle("hidden");
   if (!settings.classList.contains("hidden")) {
     guide.classList.add("hidden");
+    fieldMap.classList.remove("big");
+    expandMap.textContent = "open";
     if (!isSteamDeck()) companionInput.focus();
   }
 }
@@ -518,10 +528,22 @@ function toggleChat(forceOpen = false, opts?: { focus?: boolean }): void {
 function closePanels(): void {
   settings.classList.add("hidden");
   guide.classList.add("hidden");
+  fieldMap.classList.remove("big");
+  expandMap.textContent = "open";
   chatWindow.classList.add("hidden");
   chatInput.blur();
   stopListen();
   talkBtn.classList.remove("hot");
+}
+
+function toggleMap(): void {
+  const opening = !fieldMap.classList.contains("big");
+  fieldMap.classList.toggle("big", opening);
+  expandMap.textContent = opening ? "hide" : "open";
+  if (opening) {
+    settings.classList.add("hidden");
+    guide.classList.add("hidden");
+  }
 }
 
 function sendChat(text: string): void {
@@ -719,6 +741,9 @@ document.querySelector("#open-chat")!.addEventListener("click", () => toggleChat
 document.querySelector("#open-settings")!.addEventListener("click", toggleSettings);
 document.querySelector("#open-guide")!.addEventListener("click", toggleGuide);
 document.querySelector("#close-guide")!.addEventListener("click", () => guide.classList.add("hidden"));
+document.querySelector("#open-map")!.addEventListener("click", toggleMap);
+expandMap.addEventListener("click", toggleMap);
+minimap.addEventListener("click", toggleMap);
 hudMute.addEventListener("click", toggleMute);
 bindPtt(openTalk as HTMLElement);
 bindPtt(talkBtn as HTMLElement);
@@ -843,6 +868,8 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       settings.classList.add("hidden");
       guide.classList.add("hidden");
+      fieldMap.classList.remove("big");
+      expandMap.textContent = "open";
       chatWindow.classList.add("hidden");
       chatInput.blur();
     }
@@ -852,6 +879,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
   if (e.key === "m" || e.key === "M") toggleMute();
+  if (e.key === "n" || e.key === "N") toggleMap();
   if (e.key === "h" || e.key === "H" || e.key === "?") toggleGuide();
   if (e.key === "t" || e.key === "T" || e.key === "x" || e.key === "X") void beginPtt();
   if (e.key === "p" || e.key === "P") petDimple();
@@ -962,6 +990,7 @@ function frame(now: number): void {
     pet: petDimple,
     toggleMute,
     toggleGuide,
+    toggleMap,
     push: (lx, ly, gx, gy) => {
       const right = camera.flatRight();
       const fwd = camera.flatFwd();
@@ -1077,6 +1106,15 @@ function frame(now: number): void {
     qualityTier() === 0 ? " · deck" : qualityTier() === 3 ? " · supreme" : "";
   const guestNote = guest ? ` · ${portalStatus(guest)}` : selfNear ? " · portal open" : "";
   statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${growthLabel(snap.growth)} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}${guestNote}`;
+  drawFieldMap(minimap, {
+    dimple: snap.pos,
+    you: camera.pos,
+    yaw: camera.yaw,
+    pebble: visitor?.pos ?? null,
+    guest: guest?.pos ?? null,
+    asleep: snap.sleep > 0.45,
+    expanded: fieldMap.classList.contains("big"),
+  });
   if (snap.speech) {
     speechEl.textContent = snap.speech;
     caption.classList.toggle("on", ttsEnabled());

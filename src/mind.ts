@@ -16,7 +16,7 @@ import {
   maybeLearnName,
   memoryPacket,
 } from "./memory";
-import { landmarks, mapWorld, senseField } from "./sdf";
+import { landmarks, mapWorld, senseField, bedRest } from "./sdf";
 import { moodValence, stain } from "./emotion";
 import type { Presence } from "./agent";
 
@@ -242,12 +242,14 @@ export class Mind {
     }
 
     if (this.mood === "sleep" && time < this.until && time - this.lastTouch > 2) {
-      return this.intent(
+      return this.nestIntent(
+        presence,
         "sleep",
-        vx(0, -0.05, 0),
-        0.26,
-        0.06,
-        chance(0.003) ? "mm. the field is a blanket" : undefined,
+        chance(0.003)
+          ? dist(presence.pos, bedRest()) > 0.8
+            ? "heading to the nest. that's base."
+            : "mm. the nest is a blanket"
+          : undefined,
       );
     }
 
@@ -262,6 +264,14 @@ export class Mind {
         0.4,
         0.45,
         chance(0.01) ? "i'm listening. the field is all ears" : undefined,
+      );
+    }
+
+    if (this.mood === "rest" && time < this.until) {
+      return this.nestIntent(
+        presence,
+        "rest",
+        chance(0.006) ? "the grove is quiet. i'll hold this isolevel." : undefined,
       );
     }
 
@@ -328,24 +338,24 @@ export class Mind {
     const marks = landmarks(time);
     const roll = Math.random();
 
-    if (idle > 52) {
+    if (idle > 48) {
       if (this.mood !== "sleep") this.wasSleeping = false;
       this.mood = "sleep";
-      this.target = [...presence.pos] as Vec3;
-      this.targetIso = 0.26;
+      this.target = bedRest();
+      this.targetIso = 0.24;
       this.until = time + 10 + Math.random() * 8;
       return;
     }
 
-    if (idle > 28 && roll < 0.22) {
+    if (idle > 22 && roll < 0.34) {
       this.mood = "rest";
-      this.target = [...presence.pos] as Vec3;
-      this.targetIso = 0.32;
-      this.until = time + 3 + Math.random() * 2;
+      this.target = bedRest();
+      this.targetIso = 0.3;
+      this.until = time + 4 + Math.random() * 3;
       return;
     }
 
-    if (roll < 0.16) {
+    if (roll < 0.14) {
       this.mood = "greet";
       this.target = approachCam(presence.pos, cam);
       this.targetIso = 0.4;
@@ -353,16 +363,18 @@ export class Mind {
       return;
     }
 
-    if (roll < 0.34) {
+    if (roll < 0.4) {
       this.mood = "rest";
-      this.target = [...presence.pos] as Vec3;
-      this.targetIso = 0.34;
-      this.until = time + 2.5 + Math.random() * 2;
+      this.target = bedRest();
+      this.targetIso = 0.3;
+      this.until = time + 3 + Math.random() * 2.5;
       return;
     }
-    if (roll < 0.54) {
+    if (roll < 0.58) {
       this.mood = "climb";
-      const tops = marks.filter((m) => m.name.startsWith("monolith") || m.name === "moon-0");
+      const tops = marks.filter(
+        (m) => m.name.startsWith("monolith") || m.name.startsWith("tree") || m.name === "moon-0",
+      );
       const mark = tops[Math.floor(Math.random() * tops.length)] ?? marks[0]!;
       this.target = mark.pos;
       this.targetIso = mark.iso;
@@ -374,6 +386,33 @@ export class Mind {
     this.target = mark.pos;
     this.targetIso = mark.iso;
     this.until = time + 3 + Math.random() * 4;
+  }
+
+  private nestIntent(
+    presence: Presence,
+    mood: "sleep" | "rest",
+    speech?: string,
+  ): Intent {
+    const home = bedRest();
+    const far = dist(presence.pos, home) > 0.55;
+    this.target = home;
+    this.targetIso = mood === "sleep" ? 0.24 : 0.3;
+    if (far) {
+      return this.intent(
+        mood,
+        sub(home, presence.pos),
+        mood === "sleep" ? 0.34 : 0.36,
+        mood === "sleep" ? 0.1 : 0.16,
+        speech,
+      );
+    }
+    return this.intent(
+      mood,
+      vx(0, -0.04, 0),
+      mood === "sleep" ? 0.22 : 0.28,
+      mood === "sleep" ? 0.06 : 0.12,
+      speech,
+    );
   }
 
   private intent(
@@ -518,10 +557,10 @@ export class Mind {
         "coming. don't blink.",
       );
     }
-    if (/\b(sleep|nap|bedtime|lie down)\b/i.test(heard)) {
+    if (/\b(sleep|nap|bedtime|lie down|go to bed|bed|nest|go home)\b/i.test(heard)) {
       this.lastTouch = time - 60;
-      this.until = time + 14;
-      return this.intent("sleep", vx(0, -0.05, 0), 0.26, 0.06, "mm. waking me is a dimple too.");
+      this.until = time + 16;
+      return this.nestIntent(presence, "sleep", "mm. the nest is mine. that's base.");
     }
     if (/\b(stay|wait|settle|hold still)\b/i.test(heard)) {
       this.target = [...presence.pos] as Vec3;
@@ -617,7 +656,13 @@ function localReply(heard: string, learned: string | null): string {
     return `still skimming, ${name}. pet me if the field feels far.`;
   }
   if (/where are you/i.test(heard)) {
-    return "on the isolevel. look for the glow that looks back.";
+    return "on the isolevel. look for the glow that looks back. nest is northeast — that's base.";
+  }
+  if (/bed|nest|base|grove|home\b/i.test(heard)) {
+    return "northeast, under the dimple-trees. the nest is base. say sleep and i'll go.";
+  }
+  if (/tree|forest/i.test(heard)) {
+    return "blob trees on little trunks. they keep the nest quiet.";
   }
   if (/cloud|space|sky|star/i.test(heard)) {
     return "yeah. space sits on the field. clouds drift if you look up.";

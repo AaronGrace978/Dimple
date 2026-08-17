@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-// Keep in lockstep with src/sdf.ts — SCENE REV 3
+// Keep in lockstep with src/sdf.ts — SCENE REV 4
 
 uniform vec2 uResolution;
 uniform float uTime;
@@ -147,6 +147,34 @@ float mapLanterns(vec3 p) {
   return d;
 }
 
+float mapOneTree(vec3 p, int i) {
+  float a = i == 0 ? 0.48 : i == 1 ? 0.92 : 0.7;
+  float rad = i == 0 ? 6.28 : i == 1 ? 6.22 : 6.42;
+  float s = i == 0 ? 1.0 : i == 1 ? 0.86 : 1.12;
+  vec3 c = vec3(cos(a) * rad, 0.0, sin(a) * rad);
+  float trunkH = 0.5 * s;
+  float d = sdCappedCylinder(p - vec3(c.x, trunkH, c.z), trunkH, 0.046 * s);
+  float cy = trunkH * 2.05;
+  d = min(d, sdSphere(p - vec3(c.x, cy, c.z), 0.36 * s));
+  d = min(d, sdSphere(p - vec3(c.x + 0.2 * s, cy + 0.12, c.z - 0.08 * s), 0.24 * s));
+  d = min(d, sdSphere(p - vec3(c.x - 0.16 * s, cy + 0.05, c.z + 0.14 * s), 0.22 * s));
+  return d;
+}
+
+float mapTrees(vec3 p) {
+  float d = 1e5;
+  for (int i = 0; i < 3; i++) d = min(d, mapOneTree(p, i));
+  return d;
+}
+
+float mapBed(vec3 p) {
+  vec3 q = p - vec3(cos(0.7) * 5.72, 0.16, sin(0.7) * 5.72);
+  float d = sdTorusXZ(q, vec2(0.40, 0.09));
+  d = min(d, length(vec3(q.x, q.y * 1.7, q.z)) - 0.36);
+  d = min(d, sdSphere(q - vec3(0.14, 0.08, 0.06), 0.11));
+  return d;
+}
+
 float mapCrystals(vec3 p) {
   float d = 1e5;
   for (int i = 0; i < 6; i++) {
@@ -206,6 +234,8 @@ float mapWorld(vec3 p) {
   d = min(d, sdBox(p - vec3(-1.05, 1.0, -4.55), vec3(0.12, 1.0, 0.12)));
   d = min(d, sdBox(p - vec3(1.05, 1.0, -4.55), vec3(0.12, 1.0, 0.12)));
   d = min(d, sdBox(p - vec3(0.0, 2.12, -4.55), vec3(1.18, 0.1, 0.12)));
+  d = min(d, mapTrees(p));
+  d = min(d, mapBed(p));
   return d;
 }
 
@@ -432,6 +462,7 @@ void main() {
   float visGlow = 0.0;
   float lampGlow = 0.0;
   float portalGlow = 0.0;
+  float nestGlow = 0.0;
   vec2 hit = vec2(1e5, 0.0);
   bool found = false;
 
@@ -448,6 +479,8 @@ void main() {
       vec3 pr = p - vec3(0.0, 1.15, -4.55);
       float dp = sdTorusXY(pr, vec2(0.95, 0.07));
       portalGlow += 0.01 / (0.02 + dp * dp);
+      float db = mapBed(p);
+      nestGlow += 0.01 / (0.018 + db * db);
     }
     if (uVisitorOn > 0.5) {
       float dv = length(p - uVisitorPos) - 0.11;
@@ -481,6 +514,8 @@ void main() {
     float rr = length(p.xz);
     float lanternHit = mapLanterns(p);
     float crystalHit = mapCrystals(p);
+    float treeHit = mapTrees(p);
+    float bedHit = mapBed(p);
     bool water = p.y < 0.07 && rr < 1.18;
     bool gold = abs(rr - 1.55) < 0.12 || abs(rr - 2.45) < 0.12 || abs(rr - 4.2) < 0.18 || abs(rr - 6.8) < 0.32;
 
@@ -493,6 +528,16 @@ void main() {
         float pulse = 0.55 + 0.35 * sin(uTime * 1.7 + rr);
         emit = vec3(0.35, 0.18, 0.7) * pulse * mix(0.35, 1.0, 1.0 - clamp(uFearMean, 0.0, 1.0));
         emit += vec3(0.55, 0.32, 0.12) * uJoyMean * 0.45;
+      } else if (bedHit < 0.08) {
+        albedo = vec3(0.28, 0.14, 0.18);
+        emit = vec3(0.55, 0.22, 0.38) * (0.16 + 0.85 * uSleep);
+      } else if (treeHit < 0.07) {
+        if (p.y < 0.92) {
+          albedo = vec3(0.16, 0.09, 0.05);
+        } else {
+          albedo = vec3(0.05, 0.14, 0.07);
+          emit = vec3(0.04, 0.12, 0.06) * 0.55;
+        }
       } else if (water) {
         albedo = vec3(0.04, 0.1, 0.14);
       } else {
@@ -567,6 +612,7 @@ void main() {
   col += vec3(0.35, 0.8, 1.0) * min(visGlow * 0.05, 0.8);
   col += vec3(1.0, 0.72, 0.35) * min(lampGlow * 0.04, 1.1);
   col += vec3(0.35, 0.7, 1.0) * min(portalGlow * (0.035 + 0.05 * uPortalOpen), 1.2);
+  col += vec3(0.7, 0.28, 0.45) * min(nestGlow * (0.02 + 0.06 * uSleep), 1.0);
 
   float fog = 1.0 - exp(-0.0007 * t * t);
   col = mix(col, sky(rd), found ? fog : 0.0);

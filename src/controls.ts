@@ -18,6 +18,7 @@ export type ControlHooks = {
   push: (lx: number, ly: number, gyroX: number, gyroY: number) => void;
   toggleMute: () => void;
   toggleGuide: () => void;
+  toggleMap: () => void;
 };
 
 function edge(pad: Gamepad, i: number): boolean {
@@ -102,7 +103,7 @@ export function pollGamepad(
   if (edge(pad, 0) && !pttHeld && !hooks.chatOpen()) hooks.openChat();
   if (edge(pad, 1)) hooks.closePanels();
   if (edge(pad, 3)) hooks.toggleFollow();
-  if (edge(pad, 8) && !pttHeld) hooks.openChat();
+  if (edge(pad, 8) && !pttHeld) hooks.toggleMap();
   if (edge(pad, 9)) hooks.toggleSettings();
   if (edge(pad, 12)) hooks.pet();
   if (edge(pad, 13)) hooks.tapCenter();

@@ -512,6 +512,64 @@ body.deck #guide {
   max-height: calc(100vh - 80px);
 }
 
+#field-map {
+  position: fixed;
+  right: 18px;
+  bottom: 72px;
+  width: 168px;
+  z-index: 3;
+  pointer-events: auto;
+  background: rgba(8, 10, 16, 0.72);
+  border: 1px solid var(--line);
+  padding: 8px 8px 6px;
+  backdrop-filter: blur(12px);
+}
+
+#field-map.big {
+  width: min(340px, calc(100vw - 36px));
+  bottom: 78px;
+}
+
+.map-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+#minimap {
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
+  display: block;
+  border: 1px solid rgba(232, 228, 217, 0.12);
+  background: #07080c;
+  cursor: pointer;
+}
+
+.map-legend {
+  margin: 6px 0 0;
+  font-size: 9px;
+  color: var(--mute);
+  letter-spacing: 0.04em;
+}
+
+#field-map:not(.big) .map-legend {
+  display: none;
+}
+
+body.deck #field-map {
+  width: 148px;
+  right: 10px;
+  bottom: 56px;
+}
+
+body.deck #field-map.big {
+  width: min(320px, calc(100vw - 20px));
+  left: 10px;
+  right: 10px;
+}
+
 body.deck footer {
   font-size: 11px;
 }

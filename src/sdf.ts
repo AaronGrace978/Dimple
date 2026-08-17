@@ -18,7 +18,7 @@ export function crystalCenter(i: number): Vec3 {
   return [Math.cos(a) * 5.25, 0.62, Math.sin(a) * 5.25];
 }
 
-/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 3 */
+/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 4 */
 
 export const FOV = 1.15;
 
@@ -69,6 +69,76 @@ export function moonRadius(i: number): number {
 }
 
 export const PORTAL: Vec3 = [0, 1.15, -4.55];
+
+/** Nest under the grove, northeast of the pool. This is home / base. */
+export const GROVE_A = 0.7;
+export const BED: Vec3 = [
+  Math.cos(GROVE_A) * 5.72,
+  0.16,
+  Math.sin(GROVE_A) * 5.72,
+];
+
+export const RINGS = [1.55, 2.45, 4.2, 6.8, 8.4] as const;
+
+const TREE_A = [0.48, 0.92, 0.7] as const;
+const TREE_R = [6.28, 6.22, 6.42] as const;
+const TREE_S = [1, 0.86, 1.12] as const;
+
+export function treeCenter(i: number): Vec3 {
+  const a = TREE_A[i] ?? TREE_A[0]!;
+  const r = TREE_R[i] ?? TREE_R[0]!;
+  return [Math.cos(a) * r, 0, Math.sin(a) * r];
+}
+
+export function treeScale(i: number): number {
+  return TREE_S[i] ?? 1;
+}
+
+export function bedRest(): Vec3 {
+  return [BED[0], 0.38, BED[2]];
+}
+
+function mapOneTree(p: Vec3, i: number): number {
+  const c = treeCenter(i);
+  const s = treeScale(i);
+  const trunkH = 0.5 * s;
+  let d = sdCappedCylinder(
+    [p[0] - c[0], p[1] - trunkH, p[2] - c[2]],
+    trunkH,
+    0.046 * s,
+  );
+  const cy = trunkH * 2.05;
+  d = Math.min(d, sdSphere([p[0] - c[0], p[1] - cy, p[2] - c[2]], 0.36 * s));
+  d = Math.min(
+    d,
+    sdSphere(
+      [p[0] - (c[0] + 0.2 * s), p[1] - (cy + 0.12), p[2] - (c[2] - 0.08 * s)],
+      0.24 * s,
+    ),
+  );
+  d = Math.min(
+    d,
+    sdSphere(
+      [p[0] - (c[0] - 0.16 * s), p[1] - (cy + 0.05), p[2] - (c[2] + 0.14 * s)],
+      0.22 * s,
+    ),
+  );
+  return d;
+}
+
+export function mapTrees(p: Vec3): number {
+  let d = 1e5;
+  for (let i = 0; i < 3; i++) d = Math.min(d, mapOneTree(p, i));
+  return d;
+}
+
+export function mapBed(p: Vec3): number {
+  const q: Vec3 = [p[0] - BED[0], p[1] - BED[1], p[2] - BED[2]];
+  let d = sdTorusXZ(q, 0.4, 0.09);
+  d = Math.min(d, Math.hypot(q[0], q[1] * 1.7, q[2]) - 0.36);
+  d = Math.min(d, sdSphere([q[0] - 0.14, q[1] - 0.08, q[2] - 0.06], 0.11));
+  return d;
+}
 
 export function mapWorld(p: Vec3, time: number): number {
   const r = Math.hypot(p[0], p[2]);
@@ -127,6 +197,9 @@ export function mapWorld(p: Vec3, time: number): number {
   d = Math.min(d, sdBox([p[0] - 1.05, p[1] - 1.0, p[2] + 4.55], [0.12, 1.0, 0.12]));
   d = Math.min(d, sdBox([p[0], p[1] - 2.12, p[2] + 4.55], [1.18, 0.1, 0.12]));
 
+  d = Math.min(d, mapTrees(p));
+  d = Math.min(d, mapBed(p));
+
   return d;
 }
 
@@ -172,7 +245,17 @@ export function landmarks(time: number): Landmark[] {
     { name: "far-ring", pos: vx(-4.0, 0.45, 1.2), iso: 0.38 },
     { name: "portal", pos: copy(PORTAL), iso: 0.55 },
     { name: "outer", pos: vx(0, 0.5, 6.2), iso: 0.4 },
+    { name: "bed", pos: bedRest(), iso: 0.24 },
   ];
+  for (let i = 0; i < 3; i++) {
+    const c = treeCenter(i);
+    const s = treeScale(i);
+    list.push({
+      name: `tree-${i}`,
+      pos: [c[0], 1.05 * s, c[2]],
+      iso: 0.32,
+    });
+  }
   for (let i = 0; i < 4; i++) {
     const c = monolithCenter(i);
     list.push({

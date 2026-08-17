@@ -14,6 +14,12 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2.2 — a nest, a grove, a map
+
+He has a home now. Northeast of the pool: three dimple-trees (blob canopies on little trunks) and a nest. That is **BASE**. Rest and sleep walk him there. Say *sleep*, *bed*, *nest*, or *go home*.
+
+The **map** (HUD, **N**, Deck **SELECT**) is a top-down of the field. Pink **BASE** is the nest. Teal is Dimple. The wedge is you.
+
 ## 0.2.1 — mute means mute
 
 Mute (HUD, chat **voice**, **M**, D-pad left) now cuts Kokoro mid-sentence. In-flight speech never starts after you hush. Wander lines stay out of chat while muted. He still answers in text when you talk. **Guide** is top-right (**H** / **?** / D-pad right).
@@ -46,7 +52,7 @@ New field systems are quality-gated: Deck keeps the 40 fps budget (fewer stains,
 | **D-pad right** | Open the in-app guide |
 | **B** | Close chat / settings / guide |
 | **START** | Settings |
-| **SELECT** | Chat |
+| **SELECT** | Field map (BASE is the nest) |
 | **Right stick** | Look |
 | **R2** | Zoom |
 | **STEAM + X** | Keyboard |
@@ -61,9 +67,8 @@ Dimple has two field-dimples for eyes. They track the cursor, the camera, or a p
 - **Click him** (or **P** / D-pad up) to pet. He nuzzles and chirps.
 - **Drag him** to apply force. First shoves startle; later he trusts and leans in.
 - **Click the floor** to toss a bouncing dimple. He plays.
-- Leave him alone and he **sleeps**. Talk, pet, or tap to wake him.
-- After a long time away he notices you came back.
-- Chat still works without a key. Try *come here*, *sleep*, *play*, *spin*, *jump*, *look at me*.
+- Leave him alone and he walks back to the **nest** (BASE on the map) and **sleeps**. Talk, pet, or tap to wake him.
+- Chat still works without a key. Try *come here*, *sleep*, *go home*, *play*, *spin*, *jump*, *look at me*.
 
 ## Play
 
