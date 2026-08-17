@@ -12,12 +12,15 @@ win:
   target:
     - nsis
     - portable
+  signAndEditExecutable: false
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   shortcutName: Dimple
   artifactName: Dimple-${version}-windows-setup.${ext}
   include: build/installer.nsh
+  packElevateHelper: false
+  differentialPackage: false
 portable:
   artifactName: Dimple-${version}-windows-portable.${ext}
 mac:
