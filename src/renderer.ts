@@ -2,7 +2,10 @@ import { loc, program } from "./gl";
 import type { Vec3 } from "./math";
 import {
   dprCap,
+  pixelBudget,
   qualityTier,
+  readWebglRenderer,
+  setGpuRenderer,
   startScale,
   targetFrameMs,
   type QualityTier,
@@ -58,6 +61,8 @@ export class Renderer {
   private emaMs = 16;
   fps = 60;
   tier: QualityTier = 2;
+  canvasWidth = 0;
+  canvasHeight = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", {
@@ -66,9 +71,12 @@ export class Renderer {
       depth: false,
       stencil: false,
       powerPreference: "high-performance",
+      desynchronized: false,
+      failIfMajorPerformanceCaveat: false,
     });
     if (!gl) throw new Error("WebGL2 is required to enter the field.");
     this.gl = gl;
+    setGpuRenderer(readWebglRenderer(gl));
     this.prog = program(gl, vertSrc, fragSrc);
     const vao = gl.createVertexArray();
     if (!vao) throw new Error("Could not create VAO");
@@ -106,14 +114,23 @@ export class Renderer {
     this.emaMs = this.emaMs * 0.9 + clamped * 0.1;
     this.fps = 1000 / this.emaMs;
     const target = targetFrameMs(this.tier);
-    if (this.emaMs > target * 1.12) this.scale = Math.max(0.48, this.scale * 0.97);
-    else if (this.emaMs < target * 0.78) this.scale = Math.min(1, this.scale * 1.015);
+    if (this.emaMs > target * 1.12) this.scale = Math.max(0.48, this.scale * 0.94);
+    else if (this.emaMs < target * 0.78) this.scale = Math.min(1, this.scale * 1.02);
   }
 
   resize(): void {
     this.dpr = Math.min(window.devicePixelRatio || 1, dprCap(this.tier));
-    const w = Math.max(1, Math.floor(this.canvas.clientWidth * this.dpr * this.scale));
-    const h = Math.max(1, Math.floor(this.canvas.clientHeight * this.dpr * this.scale));
+    let w = Math.max(1, Math.floor(this.canvas.clientWidth * this.dpr * this.scale));
+    let h = Math.max(1, Math.floor(this.canvas.clientHeight * this.dpr * this.scale));
+    const budget = pixelBudget(this.tier);
+    const pixels = w * h;
+    if (pixels > budget) {
+      const s = Math.sqrt(budget / pixels);
+      w = Math.max(1, Math.floor(w * s));
+      h = Math.max(1, Math.floor(h * s));
+    }
+    this.canvasWidth = w;
+    this.canvasHeight = h;
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
       this.canvas.height = h;

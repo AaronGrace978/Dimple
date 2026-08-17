@@ -221,12 +221,13 @@ vec2 map(vec3 p) {
 
 vec3 calcNormal(vec3 p) {
   const float e = 0.0007;
-  vec2 h = vec2(e, 0.0);
-  return normalize(vec3(
-    map(p + h.xyy).x - map(p - h.xyy).x,
-    map(p + h.yxy).x - map(p - h.yxy).x,
-    map(p + h.yyx).x - map(p - h.yyx).x
-  ));
+  vec2 k = vec2(1.0, -1.0);
+  return normalize(
+    k.xyy * map(p + k.xyy * e).x +
+    k.yyx * map(p + k.yyx * e).x +
+    k.yxy * map(p + k.yxy * e).x +
+    k.xxx * map(p + k.xxx * e).x
+  );
 }
 
 float calcAO(vec3 p, vec3 n) {
@@ -300,9 +301,9 @@ void main() {
     if (i >= maxSteps) break;
     vec3 p = ro + rd * t;
     hit = map(p);
-    float da = mapAgent(p);
+    float da = length(p - uAgentPos) - 0.22;
     glow += 0.018 / (0.012 + da * da);
-    if (uQuality > 0.5 || mod(float(i), 2.0) < 0.5) {
+    if (mod(float(i), 2.0) < 0.5) {
       float dl = mapLanterns(p);
       lampGlow += 0.012 / (0.01 + dl * dl);
       vec3 pr = p - vec3(0.0, 1.15, -4.55);
@@ -310,7 +311,7 @@ void main() {
       portalGlow += 0.01 / (0.02 + dp * dp);
     }
     if (uVisitorOn > 0.5) {
-      float dv = mapVisitor(p);
+      float dv = length(p - uVisitorPos) - 0.11;
       visGlow += 0.01 / (0.02 + dv * dv);
     }
     if (hit.x < 0.0007) { found = true; break; }

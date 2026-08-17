@@ -52,6 +52,8 @@ import {
   qualityTier,
   resolvedQuality,
   saveQuality,
+  shortGpu,
+  usingIntegratedGpu,
   type QualityId,
 } from "./quality";
 import { Renderer } from "./renderer";
@@ -330,6 +332,15 @@ function applyChrome(): void {
     : "drag orbit · scroll zoom · HOLD T talk · C chat · S settings · F follow";
 }
 
+function qualityNote(): string {
+  const resolved = resolvedQuality();
+  const gpu = shortGpu();
+  if (usingIntegratedGpu()) {
+    return `quality · ${resolved} · ${gpu} (the RTX may be asleep — pick NVIDIA high-performance for Dimple)`;
+  }
+  return `quality · ${resolved} · ${gpu}`;
+}
+
 function toggleSettings(): void {
   settings.classList.toggle("hidden");
   if (!settings.classList.contains("hidden") && !isSteamDeck()) {
@@ -508,7 +519,6 @@ fillProviders();
 syncPanel();
 fillTts();
 void fillVoices();
-void prepareLocalVoice().catch(() => undefined);
 window.addEventListener("pointerdown", () => {
   void unlockAudio();
 }, { once: true });
@@ -521,6 +531,7 @@ restoreChat();
 restoreCaption();
 applyChrome();
 renderer.applyQuality();
+keyStatus.textContent = qualityNote();
 guardDoubleType(chatInput);
 setTalkUi("hold talk", false);
 onWhisperStatus((s) => {
@@ -529,6 +540,9 @@ onWhisperStatus((s) => {
 onVoiceStatus((s) => {
   keyStatus.textContent = s;
 });
+window.setTimeout(() => {
+  void prepareLocalVoice().catch(() => undefined);
+}, 1800);
 attachDrag(chatWindow, document.querySelector("#chat-drag")!, saveChatUi);
 attachDrag(caption, document.querySelector("#caption-drag")!, saveCaptionUi);
 syncMute();
@@ -541,7 +555,7 @@ qualitySelect.addEventListener("change", () => {
   saveQuality(qualitySelect.value as QualityId);
   renderer.applyQuality();
   applyChrome();
-  keyStatus.textContent = `quality · ${resolvedQuality()}`;
+  keyStatus.textContent = qualityNote();
 });
 document.querySelector("#close-settings")!.addEventListener("click", () => {
   settings.classList.add("hidden");
@@ -742,7 +756,9 @@ function frame(now: number): void {
         ? "thinking"
         : mind.provider
       : "local";
-  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${remote} · ${Math.round(renderer.fps)}fps${qualityTier() === 0 ? " · deck" : ""}`;
+  const field =
+    qualityTier() === 0 ? " · deck" : qualityTier() === 3 ? " · supreme" : "";
+  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}`;
   if (snap.speech) {
     speechEl.textContent = snap.speech;
     caption.classList.add("on");
