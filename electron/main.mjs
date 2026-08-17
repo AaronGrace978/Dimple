@@ -33,6 +33,7 @@ const MIME = {
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".woff2": "font/woff2",
+  ".wasm": "application/wasm",
   ".map": "application/json",
 };
 
@@ -148,6 +149,7 @@ function startServer() {
 
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-unsafe-webgpu");
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("no-sandbox");
   app.commandLine.appendSwitch("disable-gpu-sandbox");

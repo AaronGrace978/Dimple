@@ -33,6 +33,7 @@ export default defineConfig({
     },
   },
   build: { target: "es2022" },
+  worker: { format: "es" },
   optimizeDeps: {
     exclude: ["@huggingface/transformers", "kokoro-js"],
   },
