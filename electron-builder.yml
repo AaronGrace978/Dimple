@@ -17,6 +17,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   shortcutName: Dimple
   artifactName: Dimple-${version}-windows-setup.${ext}
+  include: build/installer.nsh
 portable:
   artifactName: Dimple-${version}-windows-portable.${ext}
 mac:

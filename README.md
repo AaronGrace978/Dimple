@@ -40,6 +40,17 @@ Double-click **Dimple** on your Desktop, or download a build from [Releases](htt
 
 On Windows from this folder: double-click `Launch Dimple.cmd`.
 
+## Windows laptops (RTX + Intel)
+
+13th-gen Intel + RTX 4060 laptops often run Electron on the **Intel iGPU** unless Windows is told to prefer NVIDIA. Dimple now:
+
+- asks Chromium for the high-performance GPU
+- writes `GpuPreference=2` for `Dimple.exe` (High performance)
+- auto-picks **medium** if it detects Intel/UHD, **high** (1080p field) if it sees the RTX
+- caps the raymarch so a QHD panel doesn't march 4K
+
+The HUD shows the GPU name (`rtx 4060 laptop` vs `uhd graphics`). If it says Intel, Settings → field quality will already have dropped. You can still pick **supreme** (1440p) once the HUD shows the RTX.
+
 ## Dev
 
 ```bash
