@@ -150,11 +150,13 @@ function startServer() {
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
 app.commandLine.appendSwitch("enable-gpu-rasterization");
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("no-sandbox");
   app.commandLine.appendSwitch("disable-gpu-sandbox");
   app.commandLine.appendSwitch("in-process-gpu");
   app.commandLine.appendSwitch("ozone-platform-hint", "x11");
+  app.commandLine.appendSwitch("disable-features", "AudioServiceSandbox,AudioServiceOutOfProcess");
 }
 
 let win;

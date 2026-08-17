@@ -46,7 +46,7 @@ export function dprCap(tier: QualityTier): number {
 }
 
 export function startScale(tier: QualityTier): number {
-  if (tier === 0) return 0.62;
+  if (tier === 0) return 0.5;
   if (tier === 1) return 0.85;
   return 1;
 }

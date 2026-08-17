@@ -24,7 +24,8 @@ type InMsg =
 
 let asr: Asr | null = null;
 let tts: Kokoro | null = null;
-let queue: Promise<void> = Promise.resolve();
+let hearQ: Promise<void> = Promise.resolve();
+let voiceQ: Promise<void> = Promise.resolve();
 
 function post(data: object, transfer: Transferable[] = []): void {
   (self as unknown as DedicatedWorkerGlobalScope).postMessage(data, transfer);
@@ -76,7 +77,7 @@ function resampleTo16k(samples: Float32Array, fromRate: number): Float32Array {
 function hasSpeechEnergy(pcm: Float32Array): boolean {
   let sum = 0;
   for (let i = 0; i < pcm.length; i++) sum += pcm[i]! * pcm[i]!;
-  return Math.sqrt(sum / Math.max(1, pcm.length)) > 0.008;
+  return Math.sqrt(sum / Math.max(1, pcm.length)) > 0.0015;
 }
 
 function normalize(text: string): string {
@@ -156,7 +157,8 @@ function copyWave(audio: { audio?: Float32Array; sampling_rate?: number }): {
 async function transcribe(pcm: Float32Array, sampleRate: number): Promise<string> {
   if (!pcm.length) return "";
   const audio = resampleTo16k(pcm, sampleRate);
-  if (audio.length < SAMPLE_RATE * 0.3 || !hasSpeechEnergy(audio)) return "";
+  if (audio.length < SAMPLE_RATE * 0.2) return "";
+  if (!hasSpeechEnergy(audio) && audio.length < SAMPLE_RATE * 0.7) return "";
   const model = await loadWhisper();
   status("hearing…");
   const result = await model(audio, {
@@ -166,7 +168,8 @@ async function transcribe(pcm: Float32Array, sampleRate: number): Promise<string
   });
   const text = normalize(result.text ?? "");
   status("whisper ready");
-  if (!text || isJunk(text)) return "";
+  if (!text) return "";
+  if (isJunk(text) && audio.length < SAMPLE_RATE * 1.1) return "";
   return text;
 }
 
@@ -205,5 +208,10 @@ function handle(msg: InMsg): Promise<void> {
 }
 
 self.onmessage = (ev: MessageEvent<InMsg>) => {
-  queue = queue.then(() => handle(ev.data));
+  const msg = ev.data;
+  if (msg.type === "init-kokoro" || msg.type === "speak") {
+    voiceQ = voiceQ.then(() => handle(msg));
+    return;
+  }
+  hearQ = hearQ.then(() => handle(msg));
 };
