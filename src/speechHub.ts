@@ -6,7 +6,7 @@ type Request =
   | { type: "init-whisper" }
   | { type: "init-kokoro" }
   | { type: "transcribe"; pcm: Float32Array; sampleRate: number }
-  | { type: "speak"; text: string; voice: string };
+  | { type: "speak"; text: string; voice: string; speed?: number };
 
 type Reply =
   | { id?: number; type: "ok" }
@@ -87,8 +87,9 @@ export async function workerTranscribe(pcm: Float32Array, sampleRate: number): P
 export async function workerSpeak(
   text: string,
   voice: string,
+  speed = 1.05,
 ): Promise<{ pcm: Float32Array; sampleRate: number }> {
-  const reply = await call({ type: "speak", text, voice });
+  const reply = await call({ type: "speak", text, voice, speed });
   if (reply.type !== "audio") throw new Error("voice worker returned no audio");
   return { pcm: reply.pcm, sampleRate: reply.sampleRate };
 }

@@ -15,6 +15,7 @@ export type ControlHooks = {
   pttStop: () => void;
   tapCenter: () => void;
   pet: () => void;
+  push: (lx: number, ly: number, gyroX: number, gyroY: number) => void;
 };
 
 function edge(pad: Gamepad, i: number): boolean {
@@ -69,6 +70,7 @@ export function pollGamepad(
   const r2 = trigger(pad, 7, 5);
   const xBtn = Boolean(pad.buttons[2]?.pressed);
   const l1 = Boolean(pad.buttons[4]?.pressed);
+  const r1 = Boolean(pad.buttons[5]?.pressed);
   const wantPtt = xBtn || l1 || l2 > 0.35;
 
   if (wantPtt && !pttHeld) hooks.pttStart();
@@ -80,8 +82,20 @@ export function pollGamepad(
     return;
   }
 
-  cam.look((rx + lx * 0.35) * dt * 2.4, (ry + ly * 0.2) * dt * 1.9);
-  cam.zoomBy(1 + (ly * 0.35 + (r2 - (wantPtt ? 0 : l2))) * dt * 1.6);
+  const gyroX = axis(pad, 6) || axis(pad, 8);
+  const gyroY = axis(pad, 7) || axis(pad, 9);
+  if (r1) {
+    hooks.push(lx, ly, gyroX, gyroY);
+  } else if (Math.abs(gyroX) + Math.abs(gyroY) > 0.35) {
+    hooks.push(0, 0, gyroX, gyroY);
+  }
+
+  if (!r1) {
+    cam.look((rx + lx * 0.35) * dt * 2.4, (ry + ly * 0.2) * dt * 1.9);
+  } else {
+    cam.look(rx * dt * 2.4, ry * dt * 1.9);
+  }
+  cam.zoomBy(1 + ((r1 ? 0 : ly) * 0.35 + (r2 - (wantPtt ? 0 : l2))) * dt * 1.6);
 
   if (edge(pad, 0) && !pttHeld && !hooks.chatOpen()) hooks.openChat();
   if (edge(pad, 1)) hooks.closePanels();

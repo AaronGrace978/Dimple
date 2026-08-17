@@ -1,5 +1,10 @@
 let ctx: AudioContext | null = null;
 let playing: AudioBufferSourceNode | null = null;
+let speaking = false;
+
+export function isSpeaking(): boolean {
+  return speaking || playing !== null;
+}
 
 export function getAudioContext(): AudioContext {
   if (!ctx || ctx.state === "closed") ctx = new AudioContext();
@@ -25,27 +30,43 @@ export function stopPcm(): void {
     /* already stopped */
   }
   playing = null;
+  speaking = false;
 }
 
-export async function playPcm(pcm: Float32Array, sampleRate: number): Promise<void> {
+export async function playPcm(
+  pcm: Float32Array,
+  sampleRate: number,
+  opts?: { rate?: number; warmth?: number },
+): Promise<void> {
   const c = await unlockAudio();
   stopPcm();
   const copy = new Float32Array(pcm);
   const buffer = c.createBuffer(1, copy.length, sampleRate);
   buffer.copyToChannel(copy, 0);
+  const rate = Math.min(1.45, Math.max(0.7, opts?.rate ?? 1));
+  const warmth = Math.min(1, Math.max(0, opts?.warmth ?? 0.65));
   await new Promise<void>((resolve, reject) => {
     const src = c.createBufferSource();
     src.buffer = buffer;
-    src.connect(c.destination);
+    src.playbackRate.value = rate;
+    const filter = c.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1800 + warmth * 9000;
+    filter.Q.value = 0.55;
+    src.connect(filter);
+    filter.connect(c.destination);
     playing = src;
+    speaking = true;
     src.onended = () => {
       if (playing === src) playing = null;
+      speaking = false;
       resolve();
     };
     try {
       src.start();
     } catch (err) {
       playing = null;
+      speaking = false;
       reject(err);
     }
   });
@@ -96,14 +117,17 @@ export async function playBytes(data: ArrayBuffer): Promise<void> {
     src.buffer = buffer;
     src.connect(c.destination);
     playing = src;
+    speaking = true;
     src.onended = () => {
       if (playing === src) playing = null;
+      speaking = false;
       resolve();
     };
     try {
       src.start();
     } catch (err) {
       playing = null;
+      speaking = false;
       reject(err);
     }
   });

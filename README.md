@@ -14,13 +14,26 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2 — the field remembers
+
+- **Emotional memory.** Fear and joy stain the SDF. Monoliths lean away from scare spots. Crystals dim or bloom. The ground itself warps.
+- **Thought archaeology.** Each spoken fragment becomes a bead in space. Walk the trails later and read old words in 3D.
+- **Touch.** Drag Dimple (or **HOLD R1 + left stick** on Deck). He startles, then leans in as trust grows. Gyro on the Deck adds a gentle shove.
+- **Voice is a body.** Pitch, speed, and warmth follow mood — startled clips high, rest is slow and warm, thinking pauses mid-line.
+- **Growth.** He starts a flicker. Talk, pet, and push and the field grows more lobes, color, and size. No XP bar.
+- **The field sings.** Distance values drive a small generative pad. Scared worlds sound different from curious ones. It ducks when he talks.
+- **Portal.** Walk the ring. On the same LAN, another Dimple can step into the shared field and the two blobs merge. Alone, you meet an echo of yourself.
+
 ## Steam Deck
 
 Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode → unpack into `~/Dimple` → **Add a Non-Steam Game** pointing at `/home/deck/Dimple/Dimple`. Game Mode launches fullscreen. Settings → field quality is **auto** (Deck uses the 40 fps preset). Voice is **local Kokoro** by default so you can hear him without ElevenLabs.
 
+New field systems are quality-gated: Deck keeps the 40 fps budget (fewer stains, simpler guest blob, two thought beads, two oscillators).
+
 | Control | What it does |
 | --- | --- |
 | **HOLD X** / **L1** / **L2** | Push-to-talk. Does **not** open chat (chat steals the mic / voice). Caption shows listening, then he speaks. |
+| **HOLD R1 + left stick** | Reach into the field and push Dimple |
 | **HOLD talk** | Same PTT on screen |
 | **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
@@ -32,7 +45,7 @@ Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode → unpack into `~/Dimple` �
 | **R2** | Zoom |
 | **STEAM + X** | Keyboard |
 | **D-pad down** or **L3/R3** | Tap the floor (he plays) |
-| **Click Dimple** | Pet him (he looks at you) |
+| **Click / drag Dimple** | Pet him, or push the field |
 If sticks don't look, open Dimple in Steam → Controller → use a **Gamepad** layout (not mouse-only).
 
 ## Buddy
@@ -40,6 +53,7 @@ If sticks don't look, open Dimple in Steam → Controller → use a **Gamepad** 
 Dimple has two field-dimples for eyes. They track the cursor, the camera, or a play pebble on the floor.
 
 - **Click him** (or **P** / D-pad up) to pet. He nuzzles and chirps.
+- **Drag him** to apply force. First shoves startle; later he trusts and leans in.
 - **Click the floor** to toss a bouncing dimple. He plays.
 - Leave him alone and he **sleeps**. Talk, pet, or tap to wake him.
 - After a long time away he notices you came back.
@@ -47,13 +61,13 @@ Dimple has two field-dimples for eyes. They track the cursor, the camera, or a p
 
 ## Play
 
-Double-click **Dimple** on your Desktop, or download a build from [Releases](https://github.com/AaronGrace978/RayMarchPrime/releases/tag/v0.1.9). That is a real window, not a browser tab.
+Double-click **Dimple** on your Desktop, or download a build from [Releases](https://github.com/AaronGrace978/RayMarchPrime/releases). That is a real window, not a browser tab.
 
 On Windows from this folder: double-click `Launch Dimple.cmd`.
 
 ## Windows laptops (RTX + Intel)
 
-13th-gen Intel + RTX 4060 laptops often run Electron on the **Intel iGPU** unless Windows is told to prefer NVIDIA. Dimple now:
+13th-gen Intel + RTX 4060 laptops often run Electron on the **Intel iGPU** unless Windows is told to prefer NVIDIA. Dimple:
 
 - asks Chromium for the high-performance GPU
 - writes `GpuPreference=2` for `Dimple.exe` (High performance)

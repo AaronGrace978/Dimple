@@ -1,7 +1,7 @@
 import "./style.css";
 import { Presence } from "./agent";
 import { OrbitCamera } from "./camera";
-import { add, rayHitsSphere, scale, type Vec3 } from "./math";
+import { add, len, madd, rayHitsSphere, scale, sub, type Vec3 } from "./math";
 import {
   appendChat,
   clearMemory,
@@ -12,6 +12,20 @@ import {
   touchSeen,
 } from "./memory";
 import { Mind, type FieldSense, type Visitor } from "./mind";
+import { clearEmotion, packEmotions } from "./emotion";
+import { bumpGrowth, clearGrowth, growthLabel, loadGrowth } from "./growth";
+import { dropBead, packBeads, clearThoughts } from "./thoughts";
+import { fieldSings, setFieldSings, tickMusic } from "./fieldMusic";
+import {
+  beacon,
+  currentGuest,
+  nearPortal,
+  portalOn,
+  portalStatus,
+  rememberEcho,
+  setPortalOn,
+} from "./portal";
+import { mapWorld } from "./sdf";
 import {
   PROVIDERS,
   clearKey,
@@ -92,6 +106,9 @@ const talkBtn = document.querySelector("#talk-chat")!;
 const openTalk = document.querySelector("#open-talk")!;
 const qualitySelect = document.querySelector<HTMLSelectElement>("#quality")!;
 const helpKeys = document.querySelector("#help-keys")!;
+const fieldSingsEl = document.querySelector<HTMLInputElement>("#field-sings")!;
+const portalOnEl = document.querySelector<HTMLInputElement>("#portal-on")!;
+const thoughtsEl = document.querySelector<HTMLElement>("#thoughts")!;
 
 function fail(message: string): never {
   boot.classList.add("hidden");
@@ -117,8 +134,12 @@ let chatting = false;
 let pointerLook: Vec3 | null = null;
 let pointerLookAt = 0;
 let lastMood = "";
+let handPos: Vec3 = [0, 0.4, 0];
+let handOn = 0;
+let lastBead = "";
 const homecoming = markSeen();
 presence.affection = homecoming.affection;
+presence.growth = loadGrowth();
 let welcomePending = homecoming.hoursAway > 2;
 
 function sense(): FieldSense {
@@ -130,7 +151,7 @@ function sense(): FieldSense {
 }
 
 function agentRadius(): number {
-  return 0.3 + presence.morph * 0.1 + presence.iso * 0.08;
+  return 0.16 + presence.growth * 0.22 + presence.morph * 0.08 + presence.iso * 0.06;
 }
 
 function lookTarget(time: number): Vec3 {
@@ -157,6 +178,7 @@ function petDimple(): void {
   const waking = mind.asleep();
   const line = mind.pet(presence, time, camera.pos);
   presence.applyIntent(mind.tick(presence, time, sense()));
+  presence.growth = bumpGrowth(0.018);
   noteSpeech(line);
   chirp(waking ? "wake" : "pet");
 }
@@ -196,7 +218,44 @@ function onFieldClick(nx: number, ny: number): void {
   placeVisitor(nx, ny);
 }
 
-camera.attach(canvas, onFieldClick);
+function applyReach(
+  nx: number,
+  ny: number,
+  dx: number,
+  dy: number,
+  phase: "start" | "move" | "end",
+): void {
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const { ro, rd } = camera.rayFromNdc(nx, ny, aspect);
+  const hit = rayHitsSphere(ro, rd, presence.pos, agentRadius() + 0.18);
+  const t = hit > 0 ? hit : 2.4;
+  handPos = add(ro, scale(rd, t));
+  handOn = 1;
+  if (phase === "end") {
+    handOn = 0.4;
+    return;
+  }
+  const right = camera.flatRight();
+  const fwd = camera.flatFwd();
+  const force = madd(scale(right, dx * 0.045), fwd, -dy * 0.045);
+  const strength = Math.min(3.8, len(force) * 9);
+  if (strength < 0.04 && phase !== "start") return;
+  presence.push(force, Math.max(0.35, strength));
+  if (presence.trust > 0.4) {
+    presence.push(sub(handPos, presence.pos), 0.55);
+  }
+  mind.feelForce(presence, performance.now() / 1000, strength, camera.pos);
+  void unlockAudio();
+}
+
+camera.attach(canvas, onFieldClick, {
+  mode: (nx, ny) => {
+    const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+    const { ro, rd } = camera.rayFromNdc(nx, ny, aspect);
+    return rayHitsSphere(ro, rd, presence.pos, agentRadius() + 0.12) > 0 ? "reach" : "orbit";
+  },
+  onReach: applyReach,
+});
 
 function selectedProvider(): ProviderId {
   return providerById(providerSelect.value).id;
@@ -310,13 +369,20 @@ function syncMute(): void {
 
 function speakDimple(text: string, fromField = false): void {
   if (fromField && !ttsFieldLines()) return;
-  void speak(text);
+  void speak(text, presence.mood);
+  if (text && text !== lastBead) {
+    lastBead = text;
+    dropBead(presence.pos, text, presence.mood, presence.hue);
+    bumpGrowth(0.012);
+  }
 }
 
 function fillTts(): void {
   ttsEngineSelect.value = ttsEngine();
   ttsOn.checked = ttsEnabled();
   ttsField.checked = ttsFieldLines();
+  fieldSingsEl.checked = fieldSings();
+  portalOnEl.checked = portalOn();
   elevenModelSelect.innerHTML = "";
   for (const id of ELEVEN_MODELS) {
     const opt = document.createElement("option");
@@ -396,8 +462,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "HOLD X / L1 / L2 talk · D-pad up pet · A chat · Y follow"
-    : "drag orbit · click Dimple to pet · HOLD T talk · C chat · P pet";
+    ? "HOLD X/L1/L2 talk · HOLD R1+stick push · D-pad up pet · A chat"
+    : "drag orbit · click pet · drag Dimple to push · HOLD T talk · P pet";
 }
 
 function qualityNote(): string {
@@ -460,6 +526,8 @@ function sendChat(text: string): void {
       });
       renderChat();
       speakDimple(reply);
+      bumpGrowth(0.02);
+      presence.growth = loadGrowth();
     })
     .finally(() => {
       chatting = false;
@@ -690,6 +758,10 @@ document.querySelector("#clear-key")!.addEventListener("click", () => {
 });
 document.querySelector("#clear-memory")!.addEventListener("click", () => {
   clearMemory();
+  clearEmotion();
+  clearThoughts();
+  clearGrowth();
+  presence.growth = loadGrowth();
   seedDimple();
   renderChat();
   companionInput.value = "";
@@ -710,7 +782,7 @@ document.querySelector("#save-tts")!.addEventListener("click", () => {
   void fillVoices();
   keyStatus.textContent = voiceLabel();
   void unlockAudio();
-  if (ttsEnabled()) void speak("hey. i'm dimple. this field is home.");
+  if (ttsEnabled()) void speak("hey. i'm dimple. this field is home.", presence.mood);
 });
 
 document.querySelector("#test-tts")!.addEventListener("click", () => {
@@ -724,7 +796,7 @@ document.querySelector("#test-tts")!.addEventListener("click", () => {
   syncMute();
   syncTtsFields();
   void unlockAudio();
-  void speak("hey. i'm dimple. this field is home.");
+  void speak("hey. i'm dimple. this field is home.", presence.mood);
 });
 
 ttsOn.addEventListener("change", () => {
@@ -732,6 +804,8 @@ ttsOn.addEventListener("change", () => {
   syncMute();
 });
 ttsField.addEventListener("change", () => setTtsFieldLines(ttsField.checked));
+fieldSingsEl.addEventListener("change", () => setFieldSings(fieldSingsEl.checked));
+portalOnEl.addEventListener("change", () => setPortalOn(portalOnEl.checked));
 ttsEngineSelect.addEventListener("change", () => {
   setTtsEngine(parseTtsEngine(ttsEngineSelect.value));
   syncTtsFields();
@@ -788,6 +862,35 @@ canvas.addEventListener("pointermove", (e) => {
   pointerLookAt = performance.now() / 1000;
 });
 
+function paintThoughts(from: Vec3): ReturnType<typeof packBeads> {
+  const packed = packBeads(from);
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const cap = qualityTier() === 0 ? 2 : 5;
+  const show = packed.labels.slice(0, cap).filter((b) => {
+    const d = Math.hypot(b.pos[0] - from[0], b.pos[1] - from[1], b.pos[2] - from[2]);
+    return d < 3.4;
+  });
+  while (thoughtsEl.childNodes.length > show.length) {
+    thoughtsEl.removeChild(thoughtsEl.lastChild!);
+  }
+  while (thoughtsEl.childNodes.length < show.length) {
+    thoughtsEl.append(document.createElement("span"));
+  }
+  show.forEach((b, i) => {
+    const el = thoughtsEl.childNodes[i] as HTMLElement;
+    const p = camera.project(b.pos, aspect);
+    if (!p || p.nx < -0.05 || p.nx > 1.05 || p.ny < -0.05 || p.ny > 1.05) {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "block";
+    el.style.left = `${p.nx * 100}%`;
+    el.style.top = `${p.ny * 100}%`;
+    el.textContent = b.word;
+  });
+  return packed;
+}
+
 let last = performance.now();
 
 function frame(now: number): void {
@@ -836,10 +939,65 @@ function frame(now: number): void {
     },
     tapCenter: () => placeVisitor(0.5, 0.62),
     pet: petDimple,
+    push: (lx, ly, gx, gy) => {
+      const right = camera.flatRight();
+      const fwd = camera.flatFwd();
+      const dir = madd(scale(right, lx + gx * 0.7), fwd, -ly + gy * 0.45);
+      const strength = Math.min(3.2, 1.1 + len(dir) * 1.4);
+      presence.push(dir, strength);
+      handOn = 1;
+      handPos = madd(presence.pos, dir, 0.32);
+      mind.feelForce(presence, time, strength, camera.pos);
+    },
   }, dt);
 
+  handOn = Math.max(0, handOn - dt * 1.8);
   const snap = presence.snapshot();
   const visitorPos: Vec3 = visitor?.pos ?? [0, 0, 0];
+  const feelings = packEmotions();
+  const beads = paintThoughts(snap.pos);
+  const selfNear = nearPortal(snap.pos);
+  const guest = currentGuest(selfNear);
+  const portalOpen = guest ? 1 : selfNear ? 0.45 : 0.08;
+  void beacon({
+    id: "self",
+    pos: snap.pos,
+    vel: snap.vel,
+    morph: snap.morph,
+    hue: snap.hue,
+    pulse: snap.pulse,
+    thought: snap.thought,
+    growth: snap.growth,
+    sleep: snap.sleep,
+    look: snap.look,
+    mood: snap.mood,
+    word: snap.speech || beads.labels[0]?.word || "",
+    nearPortal: selfNear,
+  });
+  if (selfNear) {
+    rememberEcho({
+      pos: snap.pos,
+      vel: snap.vel,
+      morph: snap.morph,
+      hue: snap.hue,
+      pulse: snap.pulse,
+      thought: snap.thought,
+      growth: snap.growth,
+      sleep: snap.sleep,
+      look: snap.look,
+      mood: snap.mood,
+      word: snap.speech,
+    });
+  }
+
+  tickMusic({
+    field: mapWorld(snap.pos, time),
+    mood: snap.mood,
+    fear: feelings.fear,
+    joy: feelings.joy,
+    growth: snap.growth,
+    iso: snap.iso,
+  });
 
   renderer.draw({
     time,
@@ -860,6 +1018,26 @@ function frame(now: number): void {
     lookAt: snap.look,
     affection: snap.affection,
     sleep: snap.sleep,
+    growth: snap.growth,
+    trust: snap.trust,
+    emotion: feelings.data,
+    emotionN: feelings.count,
+    fearMean: feelings.fear,
+    joyMean: feelings.joy,
+    guestPos: guest?.pos ?? [0, -8, 0],
+    guestVel: guest?.vel ?? [0, 0, 0],
+    guestMorph: guest?.morph ?? 0,
+    guestHue: guest?.hue ?? 0.62,
+    guestOn: guest ? 1 : 0,
+    guestGrowth: guest?.growth ?? 0.3,
+    bead0: beads.p0,
+    bead1: beads.p1,
+    bead2: beads.p2,
+    bead3: beads.p3,
+    beadW: beads.w,
+    handPos,
+    handOn,
+    portalOpen,
   });
   boot.classList.add("hidden");
 
@@ -874,7 +1052,8 @@ function frame(now: number): void {
       : "local";
   const field =
     qualityTier() === 0 ? " · deck" : qualityTier() === 3 ? " · supreme" : "";
-  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}`;
+  const guestNote = guest ? ` · ${portalStatus(guest)}` : selfNear ? " · portal open" : "";
+  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${growthLabel(snap.growth)} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}${guestNote}`;
   if (snap.speech) {
     speechEl.textContent = snap.speech;
     caption.classList.add("on");

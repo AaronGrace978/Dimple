@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-// Keep in lockstep with src/sdf.ts — SCENE REV 2
+// Keep in lockstep with src/sdf.ts — SCENE REV 3
 
 uniform vec2 uResolution;
 uniform float uTime;
@@ -23,6 +23,26 @@ uniform float uQuality;
 uniform vec3 uLookAt;
 uniform float uAffection;
 uniform float uSleep;
+uniform vec4 uEmotion[8];
+uniform float uEmotionN;
+uniform float uFearMean;
+uniform float uJoyMean;
+uniform float uGrowth;
+uniform float uTrust;
+uniform vec3 uGuestPos;
+uniform vec3 uGuestVel;
+uniform float uGuestMorph;
+uniform float uGuestHue;
+uniform float uGuestOn;
+uniform float uGuestGrowth;
+uniform vec3 uBead0;
+uniform vec3 uBead1;
+uniform vec3 uBead2;
+uniform vec3 uBead3;
+uniform vec4 uBeadW;
+uniform vec3 uHandPos;
+uniform float uHandOn;
+uniform float uPortalOpen;
 
 out vec4 fragColor;
 
@@ -102,6 +122,21 @@ float sdCappedCylinder(vec3 p, float h, float r) {
   return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
 }
 
+vec2 feelXZ(vec2 xz) {
+  float fear = 0.0;
+  float joy = 0.0;
+  int n = int(uEmotionN + 0.5);
+  for (int i = 0; i < 8; i++) {
+    if (i >= n) break;
+    vec4 e = uEmotion[i];
+    vec2 d = xz - e.xy;
+    float w = 1.0 / (1.0 + dot(d, d) * e.w);
+    if (e.z < 0.0) fear += -e.z * w;
+    else joy += e.z * w;
+  }
+  return vec2(fear, joy);
+}
+
 float mapLanterns(vec3 p) {
   float d = 1e5;
   for (int i = 0; i < 4; i++) {
@@ -117,9 +152,11 @@ float mapCrystals(vec3 p) {
   for (int i = 0; i < 6; i++) {
     float a = float(i) * 1.0471976 + 0.18;
     vec3 c = vec3(cos(a) * 5.25, 0.62, sin(a) * 5.25);
+    vec2 f = feelXZ(c.xz);
+    float size = 0.62 * mix(1.0, 0.52, clamp(f.x, 0.0, 1.0)) * mix(1.0, 1.28, clamp(f.y, 0.0, 1.0));
     vec3 q = p - c;
-    d = min(d, sdOctahedron(q, 0.62));
-    d = min(d, sdOctahedron(q - vec3(0.0, 0.72, 0.0), 0.28));
+    d = min(d, sdOctahedron(q, size));
+    d = min(d, sdOctahedron(q - vec3(0.0, 0.72, 0.0), size * 0.45));
   }
   return d;
 }
@@ -128,6 +165,8 @@ float mapWorld(vec3 p) {
   float r = length(p.xz);
   float hills = 0.62 * sin(p.x * 0.21 + 0.7) * sin(p.z * 0.18 - 0.4);
   float ground = p.y - mix(0.0, hills, smoothstep(8.2, 13.5, r));
+  ground -= uJoyMean * 0.07;
+  ground += uFearMean * 0.03;
   float d = ground;
 
   float pool = max(abs(p.y - 0.025) - 0.02, r - 1.12);
@@ -143,6 +182,11 @@ float mapWorld(vec3 p) {
   for (int i = 0; i < 4; i++) {
     float a = float(i) * 1.5707963 + 0.4;
     vec3 c = vec3(cos(a) * 3.1, 1.15, sin(a) * 3.1);
+    vec2 f = feelXZ(c.xz);
+    float al = length(c.xz);
+    vec2 away = al > 0.01 ? c.xz / al : vec2(1.0, 0.0);
+    c.xz += away * f.x * 0.42;
+    c.y += f.y * 0.12;
     d = min(d, sdBox(p - c, vec3(0.28, 1.15, 0.28)));
     d = min(d, sdBox(p - c - vec3(0.0, 1.22, 0.0), vec3(0.38, 0.08, 0.38)));
   }
@@ -158,7 +202,7 @@ float mapWorld(vec3 p) {
   }
 
   vec3 portal = p - vec3(0.0, 1.15, -4.55);
-  d = min(d, sdTorusXY(portal, vec2(0.95, 0.07)));
+  d = min(d, sdTorusXY(portal, vec2(0.95 + 0.08 * uPortalOpen, 0.07 + 0.03 * uPortalOpen)));
   d = min(d, sdBox(p - vec3(-1.05, 1.0, -4.55), vec3(0.12, 1.0, 0.12)));
   d = min(d, sdBox(p - vec3(1.05, 1.0, -4.55), vec3(0.12, 1.0, 0.12)));
   d = min(d, sdBox(p - vec3(0.0, 2.12, -4.55), vec3(1.18, 0.1, 0.12)));
@@ -178,34 +222,88 @@ float mapAgent(vec3 p) {
   }
   q.y *= mix(1.0, 1.7, uSleep);
   float t = uTime;
-  float breath = 0.18 + 0.03 * sin(t * 2.6) + 0.05 * uAgentPulse;
+  float g = clamp(uGrowth, 0.04, 1.0);
+  float breath = mix(0.055, 0.20, g) + 0.03 * sin(t * 2.6) + 0.05 * uAgentPulse;
   breath *= mix(1.0, 0.88, uSleep);
   float core = sdSphere(q, breath);
 
   float lobes = 1e5;
-  for (int i = 0; i < 3; i++) {
+  int lobeN = g < 0.1 ? 0 : 3;
+  if (uQuality > 0.5 && g > 0.42) lobeN = 5;
+  for (int i = 0; i < 5; i++) {
+    if (i >= lobeN) break;
     float fi = float(i);
     float a = t * (1.15 + 0.25 * uAgentMorph) + fi * 2.094395;
     float b = t * 0.9 + fi * 1.7;
+    float spread = mix(0.08, 0.15 + 0.12 * uAgentMorph, g);
     vec3 o = vec3(
-      cos(a) * (0.15 + 0.12 * uAgentMorph) * mix(1.0, 0.35, uSleep),
-      sin(b) * (0.09 + 0.08 * uAgentMorph) * mix(1.0, 0.2, uSleep),
-      sin(a) * (0.15 + 0.12 * uAgentMorph) * mix(1.0, 0.35, uSleep)
+      cos(a) * spread * mix(1.0, 0.35, uSleep),
+      sin(b) * (0.09 + 0.08 * uAgentMorph) * mix(1.0, 0.2, uSleep) * g,
+      sin(a) * spread * mix(1.0, 0.35, uSleep)
     );
-    lobes = smin(lobes, sdSphere(q - o, 0.08 + 0.02 * sin(t * 2.2 + fi)), 0.1);
+    lobes = smin(lobes, sdSphere(q - o, 0.05 + 0.04 * g + 0.02 * sin(t * 2.2 + fi)), 0.1);
   }
 
-  float body = smin(core, lobes, 0.13);
+  float body = lobeN > 0 ? smin(core, lobes, 0.13) : core;
 
-  if (uThought > 0.01 && uSleep < 0.7) {
+  if (uThought > 0.01 && uSleep < 0.7 && g > 0.14) {
     body = smin(body, sdSphere(q - vec3(0.0, 0.26, 0.0), 0.05 + 0.07 * uThought), 0.08);
   }
 
-  body = smin(body, sdSphere(p - uTrail0, 0.09 * uTrailW.x * mix(1.0, 0.4, uSleep)), 0.16);
-  body = smin(body, sdSphere(p - uTrail1, 0.08 * uTrailW.y * mix(1.0, 0.4, uSleep)), 0.16);
-  body = smin(body, sdSphere(p - uTrail2, 0.07 * uTrailW.z * mix(1.0, 0.4, uSleep)), 0.16);
+  float tw = mix(0.35, 1.0, g);
+  body = smin(body, sdSphere(p - uTrail0, 0.09 * uTrailW.x * tw * mix(1.0, 0.4, uSleep)), 0.16);
+  body = smin(body, sdSphere(p - uTrail1, 0.08 * uTrailW.y * tw * mix(1.0, 0.4, uSleep)), 0.16);
+  body = smin(body, sdSphere(p - uTrail2, 0.07 * uTrailW.z * tw * mix(1.0, 0.4, uSleep)), 0.16);
+
+  if (uGuestOn > 0.5) {
+    float gap = length(uAgentPos - uGuestPos);
+    if (gap < 1.85) {
+      vec3 gq = p - uGuestPos;
+      float gb = sdSphere(gq, mix(0.07, 0.18, clamp(uGuestGrowth, 0.04, 1.0)));
+      float k = mix(0.3, 0.1, smoothstep(0.25, 1.85, gap));
+      body = smin(body, gb, k);
+    }
+  }
 
   return body;
+}
+
+float mapGuestBody(vec3 p) {
+  if (uGuestOn < 0.5) return 1e5;
+  vec3 q = p - uGuestPos;
+  float sp = length(uGuestVel);
+  if (sp > 0.04 && uQuality > 0.5) {
+    vec3 vn = uGuestVel / sp;
+    float along = dot(q, vn);
+    q = vn * along * 0.78 + (q - vn * along) * 1.12;
+  }
+  float g = clamp(uGuestGrowth, 0.04, 1.0);
+  float core = sdSphere(q, mix(0.06, 0.17, g) * mix(0.9, 1.12, uGuestMorph));
+  if (uQuality < 0.5) return core;
+  float lobes = 1e5;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float a = uTime * 1.05 + fi * 2.094395;
+    vec3 o = vec3(cos(a) * 0.12 * g, sin(uTime * 0.8 + fi) * 0.07 * g, sin(a) * 0.12 * g);
+    lobes = smin(lobes, sdSphere(q - o, 0.06), 0.1);
+  }
+  return smin(core, lobes, 0.12);
+}
+
+float mapBeads(vec3 p) {
+  float d = 1e5;
+  d = min(d, sdSphere(p - uBead0, 0.04 * uBeadW.x));
+  d = min(d, sdSphere(p - uBead1, 0.038 * uBeadW.y));
+  if (uQuality > 0.5) {
+    d = min(d, sdSphere(p - uBead2, 0.036 * uBeadW.z));
+    d = min(d, sdSphere(p - uBead3, 0.034 * uBeadW.w));
+  }
+  return d;
+}
+
+float mapHand(vec3 p) {
+  if (uHandOn < 0.5) return 1e5;
+  return sdSphere(p - uHandPos, 0.09 + 0.02 * uTrust);
 }
 
 vec3 agentLook() {
@@ -244,11 +342,19 @@ vec2 map(vec3 p) {
   float a = mapAgent(p);
   float v = mapVisitor(p);
   float e = mapEyes(p);
+  float b = mapBeads(p);
+  float h = mapHand(p);
   float d = w;
   float id = 1.0;
   if (a < d) { d = a; id = 2.0; }
   if (v < d) { d = v; id = 3.0; }
   if (e < d) { d = e; id = 4.0; }
+  if (b < d) { d = b; id = 5.0; }
+  if (h < d) { d = h; id = 7.0; }
+  if (uGuestOn > 0.5 && length(uAgentPos - uGuestPos) > 1.6) {
+    float g = mapGuestBody(p);
+    if (g < d) { d = g; id = 6.0; }
+  }
   return vec2(d, id);
 }
 
@@ -384,7 +490,9 @@ void main() {
         albedo = vec3(0.4, 0.28, 0.12);
       } else if (crystalHit < 0.08) {
         albedo = vec3(0.18, 0.12, 0.32);
-        emit = vec3(0.35, 0.18, 0.7) * (0.55 + 0.35 * sin(uTime * 1.7 + rr));
+        float pulse = 0.55 + 0.35 * sin(uTime * 1.7 + rr);
+        emit = vec3(0.35, 0.18, 0.7) * pulse * mix(0.35, 1.0, 1.0 - clamp(uFearMean, 0.0, 1.0));
+        emit += vec3(0.55, 0.32, 0.12) * uJoyMean * 0.45;
       } else if (water) {
         albedo = vec3(0.04, 0.1, 0.14);
       } else {
@@ -398,17 +506,28 @@ void main() {
         }
       }
     } else if (hit.y < 2.5) {
-      vec3 agentCol = hsv(uAgentHue, 0.45 - 0.12 * uAffection, 1.0);
+      vec3 agentCol = hsv(uAgentHue, 0.45 - 0.12 * uAffection, mix(0.55, 1.0, uGrowth));
       albedo = agentCol * 0.15;
       emit = agentCol * (1.15 + 0.8 * uAgentPulse + 0.6 * uThought + 0.5 * uAffection);
       emit *= mix(1.0, 0.4, uSleep);
+      emit *= mix(0.55, 1.0, 0.4 + 0.6 * uGrowth);
     } else if (hit.y < 3.5) {
       albedo = vec3(0.2, 0.55, 0.7);
       emit = vec3(0.35, 0.85, 1.0) * 1.4;
-    } else {
+    } else if (hit.y < 4.5) {
       albedo = vec3(0.025, 0.03, 0.045);
       float spark = pow(clamp(dot(n, -rd), 0.0, 1.0), 22.0);
       emit = vec3(0.92, 0.96, 1.0) * spark * (1.3 + 0.8 * uAffection) * mix(1.0, 0.15, uSleep);
+    } else if (hit.y < 5.5) {
+      albedo = hsv(uAgentHue + 0.08, 0.35, 0.8) * 0.2;
+      emit = hsv(uAgentHue + 0.08, 0.4, 1.0) * 1.1;
+    } else if (hit.y < 6.5) {
+      vec3 guestCol = hsv(uGuestHue, 0.4, 1.0);
+      albedo = guestCol * 0.14;
+      emit = guestCol * (1.0 + 0.5 * uGuestGrowth);
+    } else {
+      albedo = vec3(0.3, 0.85, 0.9) * 0.2;
+      emit = vec3(0.45, 0.95, 1.0) * (1.1 + 0.8 * uTrust);
     }
 
     vec3 agentCol = hsv(uAgentHue, 0.5, 1.0);
@@ -447,7 +566,7 @@ void main() {
   col += agentCol * min(glow * 0.045, 1.6);
   col += vec3(0.35, 0.8, 1.0) * min(visGlow * 0.05, 0.8);
   col += vec3(1.0, 0.72, 0.35) * min(lampGlow * 0.04, 1.1);
-  col += vec3(0.35, 0.7, 1.0) * min(portalGlow * 0.035, 0.9);
+  col += vec3(0.35, 0.7, 1.0) * min(portalGlow * (0.035 + 0.05 * uPortalOpen), 1.2);
 
   float fog = 1.0 - exp(-0.0007 * t * t);
   col = mix(col, sky(rd), found ? fog : 0.0);

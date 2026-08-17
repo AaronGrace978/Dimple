@@ -30,10 +30,12 @@
       </header>
 
       <footer>
-        <span>click Dimple to pet · click the floor to play</span>
+        <span>click Dimple to pet · drag him to push · walk the trails</span>
         <span class="keys" id="help-keys">drag orbit · scroll zoom · C chat · S settings · F follow</span>
       </footer>
     </div>
+
+    <div id="thoughts" aria-hidden="true"></div>
 
     <aside id="caption" aria-label="Dimple's line">
       <div class="cap-head" id="caption-drag">
@@ -98,6 +100,8 @@
       </select>
       <label class="check"><input type="checkbox" id="tts-on" checked /> Dimple speaks</label>
       <label class="check"><input type="checkbox" id="tts-field" /> also speak field lines</label>
+      <label class="check"><input type="checkbox" id="field-sings" checked /> the field sings</label>
+      <label class="check"><input type="checkbox" id="portal-on" checked /> portal to other Dimples</label>
       <div id="local-fields">
         <label class="lbl" for="local-voice">local voice</label>
         <select id="local-voice"></select>

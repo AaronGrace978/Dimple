@@ -20,7 +20,7 @@ type InMsg =
   | { id: number; type: "init-whisper" }
   | { id: number; type: "init-kokoro" }
   | { id: number; type: "transcribe"; pcm: Float32Array; sampleRate: number }
-  | { id: number; type: "speak"; text: string; voice: string };
+  | { id: number; type: "speak"; text: string; voice: string; speed?: number };
 
 let asr: Asr | null = null;
 let tts: Kokoro | null = null;
@@ -173,10 +173,17 @@ async function transcribe(pcm: Float32Array, sampleRate: number): Promise<string
   return text;
 }
 
-async function speak(text: string, voice: string): Promise<{ pcm: Float32Array; sampleRate: number }> {
+async function speak(
+  text: string,
+  voice: string,
+  speed = 1.05,
+): Promise<{ pcm: Float32Array; sampleRate: number }> {
   const model = await loadKokoro();
   status("speaking…");
-  const audio = await model.generate(text, { voice, speed: 1.05 });
+  const audio = await model.generate(text, {
+    voice,
+    speed: Math.min(1.4, Math.max(0.7, speed)),
+  });
   status("voice ready");
   return copyWave(audio);
 }
@@ -199,7 +206,7 @@ function handle(msg: InMsg): Promise<void> {
         post({ id: msg.id, type: "transcript", text });
         return;
       }
-      const { pcm, sampleRate } = await speak(msg.text, msg.voice);
+      const { pcm, sampleRate } = await speak(msg.text, msg.voice, msg.speed);
       post({ id: msg.id, type: "audio", pcm, sampleRate }, [pcm.buffer]);
     } catch (err) {
       fail(msg.id, err);

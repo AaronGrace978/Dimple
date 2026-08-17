@@ -88,6 +88,29 @@ footer {
   letter-spacing: 0.04em;
 }
 
+#thoughts {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#thoughts span {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(232, 228, 217, 0.78);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  opacity: 0.82;
+}
+
+body.deck #thoughts span {
+  font-size: 12px;
+}
+
 #caption {
   position: fixed;
   left: max(16px, calc(50% - 13rem));

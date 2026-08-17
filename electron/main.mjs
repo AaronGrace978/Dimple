@@ -4,10 +4,76 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import dgram from "node:dgram";
 import { app, BrowserWindow, dialog, globalShortcut, session, shell } from "electron";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PREFERRED_PORT = 17321;
+const PORTAL_PORT = 17322;
+const selfPortalId = `e${Math.random().toString(36).slice(2, 10)}`;
+const portalPeers = new Map();
+const localPortalIds = new Set();
+let portalSock = null;
+
+function json(res, code, body) {
+  const buf = Buffer.from(JSON.stringify(body));
+  res.writeHead(code, {
+    "content-type": "application/json",
+    "content-length": String(buf.length),
+    "access-control-allow-origin": "*",
+  });
+  res.end(buf);
+}
+
+function prunePeers() {
+  const now = Date.now();
+  for (const [id, row] of portalPeers) {
+    if (now - row.seen > 4000) portalPeers.delete(id);
+  }
+}
+
+function notePeer(blob, host) {
+  if (!blob || typeof blob !== "object" || !blob.id || blob.id === selfPortalId) return;
+  if (localPortalIds.has(blob.id)) return;
+  portalPeers.set(blob.id, { ...blob, host, seen: Date.now() });
+}
+
+function startPortalUdp() {
+  try {
+    const sock = dgram.createSocket({ type: "udp4", reuseAddr: true });
+    sock.on("message", (msg, rinfo) => {
+      try {
+        notePeer(JSON.parse(msg.toString("utf8")), rinfo.address);
+      } catch {
+        /* ignore junk */
+      }
+    });
+    sock.on("error", () => {
+      /* another instance may own the port */
+    });
+    sock.bind(PORTAL_PORT, () => {
+      try {
+        sock.setBroadcast(true);
+      } catch {
+        /* some OS */
+      }
+    });
+    portalSock = sock;
+  } catch {
+    portalSock = null;
+  }
+}
+
+function broadcastPortal(blob) {
+  if (!portalSock) return;
+  if (blob?.id) localPortalIds.add(blob.id);
+  const payload = Buffer.from(JSON.stringify({ ...blob, id: blob.id || selfPortalId }));
+  try {
+    portalSock.send(payload, 0, payload.length, PORTAL_PORT, "255.255.255.255");
+  } catch {
+    /* LAN may block broadcast */
+  }
+}
 
 const PROXY = [
   ["/p/openai", "https://api.openai.com"],
@@ -109,6 +175,30 @@ function startServer() {
           void shell.openExternal("steam://open/keyboard");
           res.writeHead(204);
           res.end();
+          return;
+        }
+        if (urlPath === "/portal/peers") {
+          prunePeers();
+          json(res, 200, { peers: [...portalPeers.values()] });
+          return;
+        }
+        if (urlPath === "/portal/beacon" && (req.method === "POST" || req.method === "OPTIONS")) {
+          if (req.method === "OPTIONS") {
+            res.writeHead(204, { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" });
+            res.end();
+            return;
+          }
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          try {
+            const blob = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+            if (blob?.id) localPortalIds.add(blob.id);
+            broadcastPortal(blob);
+          } catch {
+            json(res, 400, { error: "bad beacon" });
+            return;
+          }
+          json(res, 200, { ok: true });
           return;
         }
         const proxied = matchProxy(urlPath);
@@ -230,6 +320,7 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   try {
+    startPortalUdp();
     await createWindow();
     globalShortcut.register("F11", () => {
       if (win) win.setFullScreen(!win.isFullScreen());

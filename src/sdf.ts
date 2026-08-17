@@ -1,4 +1,5 @@
 import { add, copy, type Vec3, vx } from "./math";
+import { feelXZ } from "./emotion";
 
 function sdOctahedron(p: Vec3, s: number): number {
   return (Math.abs(p[0]) + Math.abs(p[1]) + Math.abs(p[2]) - s) * 0.57735027;
@@ -17,7 +18,7 @@ export function crystalCenter(i: number): Vec3 {
   return [Math.cos(a) * 5.25, 0.62, Math.sin(a) * 5.25];
 }
 
-/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 2 */
+/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 3 */
 
 export const FOV = 1.15;
 
@@ -73,7 +74,8 @@ export function mapWorld(p: Vec3, time: number): number {
   const r = Math.hypot(p[0], p[2]);
   const hills = 0.62 * Math.sin(p[0] * 0.21 + 0.7) * Math.sin(p[2] * 0.18 - 0.4);
   const t = Math.min(1, Math.max(0, (r - 8.2) / (13.5 - 8.2)));
-  let d = p[1] - hills * t;
+  const feel = feelXZ(p[0], p[2]);
+  let d = p[1] - hills * t - feel.joy * 0.07 + feel.fear * 0.03;
 
   d = Math.min(d, Math.max(Math.abs(p[1] - 0.025) - 0.02, r - 1.12));
   d = Math.min(d, sdCappedCylinder([p[0], p[1] - 0.06, p[2]], 0.06, 1.28));
@@ -85,25 +87,32 @@ export function mapWorld(p: Vec3, time: number): number {
 
   for (let i = 0; i < 4; i++) {
     const c = monolithCenter(i);
+    const feel = feelXZ(c[0], c[2]);
+    const al = Math.hypot(c[0], c[2]) || 1;
+    const mx = c[0] + (c[0] / al) * feel.fear * 0.42;
+    const mz = c[2] + (c[2] / al) * feel.fear * 0.42;
+    const my = c[1] + feel.joy * 0.12;
     d = Math.min(
       d,
-      sdBox([p[0] - c[0], p[1] - c[1], p[2] - c[2]], [0.28, 1.15, 0.28]),
+      sdBox([p[0] - mx, p[1] - my, p[2] - mz], [0.28, 1.15, 0.28]),
     );
     d = Math.min(
       d,
-      sdBox([p[0] - c[0], p[1] - (c[1] + 1.22), p[2] - c[2]], [0.38, 0.08, 0.38]),
+      sdBox([p[0] - mx, p[1] - (my + 1.22), p[2] - mz], [0.38, 0.08, 0.38]),
     );
     d = Math.min(
       d,
-      sdSphere([p[0] - c[0], p[1] - 2.52, p[2] - c[2]], 0.1),
+      sdSphere([p[0] - mx, p[1] - 2.52, p[2] - mz], 0.1),
     );
   }
 
   for (let i = 0; i < 6; i++) {
     const c = crystalCenter(i);
+    const feel = feelXZ(c[0], c[2]);
+    const size = 0.62 * (1 - Math.min(0.48, feel.fear * 0.48)) * (1 + Math.min(0.28, feel.joy * 0.28));
     const q: Vec3 = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
-    d = Math.min(d, sdOctahedron(q, 0.62));
-    d = Math.min(d, sdOctahedron([q[0], q[1] - 0.72, q[2]], 0.28));
+    d = Math.min(d, sdOctahedron(q, size));
+    d = Math.min(d, sdOctahedron([q[0], q[1] - 0.72, q[2]], size * 0.45));
   }
 
   for (let i = 0; i < 3; i++) {

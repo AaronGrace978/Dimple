@@ -55,11 +55,17 @@ export function prepareLocalVoice(): Promise<void> {
   });
 }
 
-export async function speakLocal(text: string): Promise<void> {
+export async function speakLocal(
+  text: string,
+  opts?: { speed?: number; pitch?: number; warmth?: number },
+): Promise<void> {
   const line = text.trim();
   if (!line) return;
   emit("speaking…");
-  const audio = await workerSpeak(line, localVoice());
-  await playPcm(audio.pcm, audio.sampleRate);
+  const audio = await workerSpeak(line, localVoice(), opts?.speed ?? 1.05);
+  await playPcm(audio.pcm, audio.sampleRate, {
+    rate: opts?.pitch ?? 1,
+    warmth: opts?.warmth ?? 0.65,
+  });
   emit("voice ready");
 }

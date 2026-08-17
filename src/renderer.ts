@@ -32,6 +32,26 @@ export type FrameState = {
   lookAt: Vec3;
   affection: number;
   sleep: number;
+  growth: number;
+  trust: number;
+  emotion: Float32Array;
+  emotionN: number;
+  fearMean: number;
+  joyMean: number;
+  guestPos: Vec3;
+  guestVel: Vec3;
+  guestMorph: number;
+  guestHue: number;
+  guestOn: number;
+  guestGrowth: number;
+  bead0: Vec3;
+  bead1: Vec3;
+  bead2: Vec3;
+  bead3: Vec3;
+  beadW: [number, number, number, number];
+  handPos: Vec3;
+  handOn: number;
+  portalOpen: number;
 };
 
 type Uniforms = {
@@ -55,6 +75,26 @@ type Uniforms = {
   uLookAt: WebGLUniformLocation;
   uAffection: WebGLUniformLocation;
   uSleep: WebGLUniformLocation;
+  uEmotion: WebGLUniformLocation;
+  uEmotionN: WebGLUniformLocation;
+  uFearMean: WebGLUniformLocation;
+  uJoyMean: WebGLUniformLocation;
+  uGrowth: WebGLUniformLocation;
+  uTrust: WebGLUniformLocation;
+  uGuestPos: WebGLUniformLocation;
+  uGuestVel: WebGLUniformLocation;
+  uGuestMorph: WebGLUniformLocation;
+  uGuestHue: WebGLUniformLocation;
+  uGuestOn: WebGLUniformLocation;
+  uGuestGrowth: WebGLUniformLocation;
+  uBead0: WebGLUniformLocation;
+  uBead1: WebGLUniformLocation;
+  uBead2: WebGLUniformLocation;
+  uBead3: WebGLUniformLocation;
+  uBeadW: WebGLUniformLocation;
+  uHandPos: WebGLUniformLocation;
+  uHandOn: WebGLUniformLocation;
+  uPortalOpen: WebGLUniformLocation;
 };
 
 export class Renderer {
@@ -108,6 +148,26 @@ export class Renderer {
       uLookAt: loc(gl, this.prog, "uLookAt"),
       uAffection: loc(gl, this.prog, "uAffection"),
       uSleep: loc(gl, this.prog, "uSleep"),
+      uEmotion: loc(gl, this.prog, "uEmotion[0]"),
+      uEmotionN: loc(gl, this.prog, "uEmotionN"),
+      uFearMean: loc(gl, this.prog, "uFearMean"),
+      uJoyMean: loc(gl, this.prog, "uJoyMean"),
+      uGrowth: loc(gl, this.prog, "uGrowth"),
+      uTrust: loc(gl, this.prog, "uTrust"),
+      uGuestPos: loc(gl, this.prog, "uGuestPos"),
+      uGuestVel: loc(gl, this.prog, "uGuestVel"),
+      uGuestMorph: loc(gl, this.prog, "uGuestMorph"),
+      uGuestHue: loc(gl, this.prog, "uGuestHue"),
+      uGuestOn: loc(gl, this.prog, "uGuestOn"),
+      uGuestGrowth: loc(gl, this.prog, "uGuestGrowth"),
+      uBead0: loc(gl, this.prog, "uBead0"),
+      uBead1: loc(gl, this.prog, "uBead1"),
+      uBead2: loc(gl, this.prog, "uBead2"),
+      uBead3: loc(gl, this.prog, "uBead3"),
+      uBeadW: loc(gl, this.prog, "uBeadW"),
+      uHandPos: loc(gl, this.prog, "uHandPos"),
+      uHandOn: loc(gl, this.prog, "uHandOn"),
+      uPortalOpen: loc(gl, this.prog, "uPortalOpen"),
     };
     this.applyQuality();
   }
@@ -192,6 +252,26 @@ export class Renderer {
     gl.uniform3f(u.uLookAt, state.lookAt[0], state.lookAt[1], state.lookAt[2]);
     gl.uniform1f(u.uAffection, state.affection);
     gl.uniform1f(u.uSleep, state.sleep);
+    gl.uniform4fv(u.uEmotion, state.emotion);
+    gl.uniform1f(u.uEmotionN, state.emotionN);
+    gl.uniform1f(u.uFearMean, state.fearMean);
+    gl.uniform1f(u.uJoyMean, state.joyMean);
+    gl.uniform1f(u.uGrowth, state.growth);
+    gl.uniform1f(u.uTrust, state.trust);
+    gl.uniform3f(u.uGuestPos, state.guestPos[0], state.guestPos[1], state.guestPos[2]);
+    gl.uniform3f(u.uGuestVel, state.guestVel[0], state.guestVel[1], state.guestVel[2]);
+    gl.uniform1f(u.uGuestMorph, state.guestMorph);
+    gl.uniform1f(u.uGuestHue, state.guestHue);
+    gl.uniform1f(u.uGuestOn, state.guestOn);
+    gl.uniform1f(u.uGuestGrowth, state.guestGrowth);
+    gl.uniform3f(u.uBead0, state.bead0[0], state.bead0[1], state.bead0[2]);
+    gl.uniform3f(u.uBead1, state.bead1[0], state.bead1[1], state.bead1[2]);
+    gl.uniform3f(u.uBead2, state.bead2[0], state.bead2[1], state.bead2[2]);
+    gl.uniform3f(u.uBead3, state.bead3[0], state.bead3[1], state.bead3[2]);
+    gl.uniform4f(u.uBeadW, state.beadW[0], state.beadW[1], state.beadW[2], state.beadW[3]);
+    gl.uniform3f(u.uHandPos, state.handPos[0], state.handPos[1], state.handPos[2]);
+    gl.uniform1f(u.uHandOn, state.handOn);
+    gl.uniform1f(u.uPortalOpen, state.portalOpen);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }

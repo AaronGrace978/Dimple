@@ -17,6 +17,7 @@ import {
   memoryPacket,
 } from "./memory";
 import { landmarks, mapWorld, senseField } from "./sdf";
+import { moodValence, stain } from "./emotion";
 import type { Presence } from "./agent";
 
 export type Visitor = { pos: Vec3 } | null;
@@ -47,6 +48,7 @@ const HUE = {
   play: 0.16,
   sleep: 0.68,
   greet: 0.12,
+  trust: 0.88,
 } as const;
 
 type Mood = keyof typeof HUE;
@@ -82,6 +84,7 @@ export class Mind {
   private lastTouch = 0;
   private playSpin = 0;
   private wasSleeping = false;
+  private lastStain = 0;
 
   reload(): void {
     this.provider = loadProviderId();
@@ -112,7 +115,9 @@ export class Mind {
     presence.pulse = 1;
     presence.thought = Math.max(presence.thought, 0.55);
     presence.affection = bumpAffection(0.12);
+    presence.trust = Math.min(1, presence.trust + 0.14);
     addFact("likes being petted");
+    stain(presence.pos, 0.9, 0.22);
     const toward = towardCam(presence.pos, cam);
     const line = waking
       ? pick(WAKE_LINES)
@@ -120,6 +125,29 @@ export class Mind {
     this.held = this.intent("nuzzle", toward, 0.34, 0.16, line);
     this.heldUntil = time + 2.4;
     return line;
+  }
+
+  feelForce(presence: Presence, time: number, strength: number, cam: Vec3): void {
+    this.touch(time);
+    const sudden = strength > 1.6 && presence.trust < 0.28;
+    if (sudden) {
+      this.mood = "startle";
+      this.until = time + 0.7;
+      this.held = this.intent("startle", towardCam(presence.pos, cam), 0.55, 0.9, "the field jumped");
+      this.heldUntil = time + 0.7;
+      presence.startle();
+      stain(presence.pos, -0.7, 0.18);
+      return;
+    }
+    presence.trust = Math.min(1, presence.trust + 0.045 * Math.min(1, strength));
+    stain(presence.pos, 0.45, 0.06);
+    if (presence.trust > 0.38) {
+      this.mood = "trust";
+      this.until = time + 1.2;
+      const toward = towardCam(presence.pos, cam);
+      this.held = this.intent("trust", toward, 0.36, 0.22);
+      this.heldUntil = time + 1.2;
+    }
   }
 
   greet(presence: Presence, time: number, cam: Vec3, speech: string): void {
@@ -158,6 +186,11 @@ export class Mind {
       this.held = this.pending;
       this.pending = null;
       this.heldUntil = time + 2.6;
+    }
+
+    if (time - this.lastStain > 0.85) {
+      this.lastStain = time;
+      stain(presence.pos, moodValence(this.mood), this.mood === "startle" ? 0.16 : 0.05);
     }
 
     const sleeping = this.mood === "sleep";
@@ -202,6 +235,10 @@ export class Mind {
 
     if (this.mood === "nuzzle" && time < this.until) {
       return this.intent("nuzzle", towardCam(presence.pos, sense.cam), 0.34, 0.14);
+    }
+
+    if (this.mood === "trust" && time < this.until) {
+      return this.intent("trust", towardCam(presence.pos, sense.cam), 0.36, 0.2);
     }
 
     if (this.mood === "sleep" && time < this.until && time - this.lastTouch > 2) {

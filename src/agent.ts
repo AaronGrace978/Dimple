@@ -25,6 +25,8 @@ export type PresenceState = {
   speech: string;
   affection: number;
   sleep: number;
+  trust: number;
+  growth: number;
   look: Vec3;
   trail0: Vec3;
   trail1: Vec3;
@@ -44,6 +46,8 @@ export class Presence {
   speech = "";
   affection = 0;
   sleep = 0;
+  trust = 0;
+  growth = 0.08;
   look: Vec3 = vx(0, 0.6, 0);
   wish: Vec3 = vx();
   targetIso = 0.42;
@@ -76,6 +80,14 @@ export class Presence {
   startle(): void {
     this.pulse = 1;
     this.thought = Math.max(this.thought, 0.4);
+    this.trust = Math.max(0, this.trust - 0.08);
+  }
+
+  /** Reach into the field. Force is world-space. */
+  push(dir: Vec3, strength: number): void {
+    const s = clamp(strength, 0, 4.5);
+    this.vel = madd(this.vel, normalize(dir), s);
+    this.pulse = Math.max(this.pulse, Math.min(1, s * 0.35));
   }
 
   /** Rise on the isolevel — a hop made of distance. */
@@ -106,6 +118,7 @@ export class Presence {
       this.look[1] + (this.lookGoal[1] - this.look[1]) * lookMix,
       this.look[2] + (this.lookGoal[2] - this.look[2]) * lookMix,
     ];
+    this.trust = Math.max(0, this.trust - dt * 0.012);
 
     const accel = 5.8;
     this.vel = madd(this.vel, this.wish, accel * dt);
@@ -148,6 +161,8 @@ export class Presence {
       speech: this.speech,
       affection: this.affection,
       sleep: this.sleep,
+      trust: this.trust,
+      growth: this.growth,
       look: copy(this.look),
       trail0: copy(this.trails[0] ?? this.pos),
       trail1: copy(this.trails[1] ?? this.pos),

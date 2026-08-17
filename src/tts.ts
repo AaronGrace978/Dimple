@@ -1,4 +1,5 @@
 import { playBytes, stopPcm, unlockAudio } from "./audio";
+import { shapeLine, voiceForMood } from "./moodVoice";
 import { isSteamDeck } from "./quality";
 import { speakLocal } from "./voice";
 
@@ -110,16 +111,17 @@ export async function listElevenVoices(key = elevenKey()): Promise<{ id: string;
   }
 }
 
-export async function speak(text: string): Promise<void> {
-  const line = text.trim();
+export async function speak(text: string, mood = "wander"): Promise<void> {
+  const line = shapeLine(text, mood);
   if (!line || !ttsEnabled()) return;
   stopSpeak();
   await unlockAudio();
+  const shape = voiceForMood(mood);
 
   const engine = ttsEngine();
   if (engine === "elevenlabs" && elevenKey()) {
     try {
-      await speakEleven(line);
+      await speakEleven(line, shape);
       return;
     } catch {
       /* Deck / missing key / network — fall through */
@@ -127,27 +129,27 @@ export async function speak(text: string): Promise<void> {
   }
   if (engine !== "browser") {
     try {
-      await speakLocal(line);
+      await speakLocal(line, { speed: shape.speed, pitch: shape.pitch, warmth: shape.warmth });
       return;
     } catch {
       /* fall through */
     }
   }
-  if (speakBrowser(line)) return;
+  if (speakBrowser(line, shape)) return;
   try {
-    await speakLocal(line);
+    await speakLocal(line, { speed: shape.speed, pitch: shape.pitch, warmth: shape.warmth });
   } catch {
     /* nowhere left to speak */
   }
 }
 
-function speakBrowser(text: string): boolean {
+function speakBrowser(text: string, shape = voiceForMood("wander")): boolean {
   try {
     const voices = speechSynthesis.getVoices();
     if (!voices.length && isSteamDeck()) return false;
     const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 0.96;
-    utter.pitch = 1.05;
+    utter.rate = shape.speed;
+    utter.pitch = shape.pitch;
     const soft = voices.find((v) => /natural|neural|aria|jenny|samantha|google/i.test(v.name));
     if (soft) utter.voice = soft;
     speechSynthesis.speak(utter);
@@ -157,7 +159,10 @@ function speakBrowser(text: string): boolean {
   }
 }
 
-async function speakEleven(text: string): Promise<void> {
+async function speakEleven(
+  text: string,
+  shape = voiceForMood("wander"),
+): Promise<void> {
   const res = await fetch(
     `/p/elevenlabs/v1/text-to-speech/${encodeURIComponent(elevenVoice())}?output_format=mp3_44100_128`,
     {
@@ -170,7 +175,11 @@ async function speakEleven(text: string): Promise<void> {
       body: JSON.stringify({
         text,
         model_id: elevenModel(),
-        voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+        voice_settings: {
+          stability: 0.28 + shape.warmth * 0.4,
+          similarity_boost: 0.7,
+          style: shape.speed > 1.1 ? 0.35 : 0.12,
+        },
       }),
     },
   );
