@@ -23,6 +23,9 @@ export type PresenceState = {
   thought: number;
   mood: string;
   speech: string;
+  affection: number;
+  sleep: number;
+  look: Vec3;
   trail0: Vec3;
   trail1: Vec3;
   trail2: Vec3;
@@ -39,10 +42,14 @@ export class Presence {
   thought = 0;
   mood = "awake";
   speech = "";
+  affection = 0;
+  sleep = 0;
+  look: Vec3 = vx(0, 0.6, 0);
   wish: Vec3 = vx();
   targetIso = 0.42;
   targetMorph = 0.35;
   targetHue = 0.48;
+  private lookGoal: Vec3 = vx(0, 0.6, 0);
   private trails: Vec3[] = [copy(this.pos), copy(this.pos), copy(this.pos)];
   private trailClock = 0;
   private speechClock = 0;
@@ -71,6 +78,17 @@ export class Presence {
     this.thought = Math.max(this.thought, 0.4);
   }
 
+  /** Rise on the isolevel — a hop made of distance. */
+  hop(): void {
+    this.pulse = 1;
+    this.targetIso = clamp(this.targetIso + 0.38, 0.22, 1.35);
+    this.thought = Math.max(this.thought, 0.35);
+  }
+
+  gaze(at: Vec3): void {
+    this.lookGoal = copy(at);
+  }
+
   tick(dt: number, time: number): void {
     this.iso += (this.targetIso - this.iso) * Math.min(1, dt * 2.4);
     this.morph += (this.targetMorph - this.morph) * Math.min(1, dt * 1.8);
@@ -79,6 +97,15 @@ export class Presence {
     this.thought = Math.max(0, this.thought - dt * 0.55);
     this.speechClock = Math.max(0, this.speechClock - dt);
     if (this.speechClock <= 0) this.speech = "";
+
+    const wantSleep = this.mood === "sleep" ? 1 : 0;
+    this.sleep += (wantSleep - this.sleep) * Math.min(1, dt * 1.4);
+    const lookMix = Math.min(1, dt * 5.2);
+    this.look = [
+      this.look[0] + (this.lookGoal[0] - this.look[0]) * lookMix,
+      this.look[1] + (this.lookGoal[1] - this.look[1]) * lookMix,
+      this.look[2] + (this.lookGoal[2] - this.look[2]) * lookMix,
+    ];
 
     const accel = 5.8;
     this.vel = madd(this.vel, this.wish, accel * dt);
@@ -119,6 +146,9 @@ export class Presence {
       thought: this.thought,
       mood: this.mood,
       speech: this.speech,
+      affection: this.affection,
+      sleep: this.sleep,
+      look: copy(this.look),
       trail0: copy(this.trails[0] ?? this.pos),
       trail1: copy(this.trails[1] ?? this.pos),
       trail2: copy(this.trails[2] ?? this.pos),

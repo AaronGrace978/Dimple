@@ -51,6 +51,42 @@ export async function playPcm(pcm: Float32Array, sampleRate: number): Promise<vo
   });
 }
 
+/** Quiet field-tick. Does not cut off spoken audio. */
+export function chirp(kind: "pet" | "wake" | "sleep"): void {
+  void unlockAudio().then((c) => {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = "sine";
+    const t = c.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    if (kind === "pet") {
+      o.frequency.setValueAtTime(392, t);
+      o.frequency.exponentialRampToValueAtTime(660, t + 0.07);
+      o.frequency.exponentialRampToValueAtTime(523, t + 0.16);
+      g.gain.exponentialRampToValueAtTime(0.055, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+      o.start(t);
+      o.stop(t + 0.22);
+    } else if (kind === "wake") {
+      o.frequency.setValueAtTime(280, t);
+      o.frequency.exponentialRampToValueAtTime(520, t + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.04, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.start(t);
+      o.stop(t + 0.3);
+    } else {
+      o.frequency.setValueAtTime(330, t);
+      o.frequency.exponentialRampToValueAtTime(180, t + 0.22);
+      g.gain.exponentialRampToValueAtTime(0.03, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+      o.start(t);
+      o.stop(t + 0.34);
+    }
+    o.connect(g);
+    g.connect(c.destination);
+  });
+}
+
 export async function playBytes(data: ArrayBuffer): Promise<void> {
   const c = await unlockAudio();
   stopPcm();

@@ -70,3 +70,14 @@ export function set(out: Vec3, x: number, y: number, z: number): Vec3 {
 export function copy(a: Vec3): Vec3 {
   return [a[0], a[1], a[2]];
 }
+
+/** Ray-sphere hit distance, or -1 if the ray misses. */
+export function rayHitsSphere(ro: Vec3, rd: Vec3, center: Vec3, radius: number): number {
+  const oc = sub(ro, center);
+  const b = dot(oc, rd);
+  const c = dot(oc, oc) - radius * radius;
+  const disc = b * b - c;
+  if (disc < 0) return -1;
+  const t = -b - Math.sqrt(disc);
+  return t > 0.04 ? t : -1;
+}

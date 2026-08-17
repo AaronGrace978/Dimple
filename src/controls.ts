@@ -14,6 +14,7 @@ export type ControlHooks = {
   pttStart: () => void;
   pttStop: () => void;
   tapCenter: () => void;
+  pet: () => void;
 };
 
 function edge(pad: Gamepad, i: number): boolean {
@@ -67,7 +68,7 @@ export function pollGamepad(
   if (edge(pad, 3)) hooks.toggleFollow();
   if (edge(pad, 8)) hooks.openChat();
   if (edge(pad, 9)) hooks.toggleSettings();
-  if (edge(pad, 12)) hooks.toggleFollow();
+  if (edge(pad, 12)) hooks.pet();
   if (edge(pad, 13)) hooks.tapCenter();
   if (edge(pad, 10) || edge(pad, 11)) hooks.tapCenter();
 }

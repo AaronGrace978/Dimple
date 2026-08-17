@@ -20,6 +20,9 @@ uniform vec3 uTrail1;
 uniform vec3 uTrail2;
 uniform vec3 uTrailW;
 uniform float uQuality;
+uniform vec3 uLookAt;
+uniform float uAffection;
+uniform float uSleep;
 
 out vec4 fragColor;
 
@@ -173,8 +176,10 @@ float mapAgent(vec3 p) {
     float k = clamp(sp * 0.32, 0.0, 0.5);
     q = par * (1.0 - k) + perp * (1.0 + k * 0.4);
   }
+  q.y *= mix(1.0, 1.7, uSleep);
   float t = uTime;
   float breath = 0.18 + 0.03 * sin(t * 2.6) + 0.05 * uAgentPulse;
+  breath *= mix(1.0, 0.88, uSleep);
   float core = sdSphere(q, breath);
 
   float lobes = 1e5;
@@ -183,24 +188,50 @@ float mapAgent(vec3 p) {
     float a = t * (1.15 + 0.25 * uAgentMorph) + fi * 2.094395;
     float b = t * 0.9 + fi * 1.7;
     vec3 o = vec3(
-      cos(a) * (0.15 + 0.12 * uAgentMorph),
-      sin(b) * (0.09 + 0.08 * uAgentMorph),
-      sin(a) * (0.15 + 0.12 * uAgentMorph)
+      cos(a) * (0.15 + 0.12 * uAgentMorph) * mix(1.0, 0.35, uSleep),
+      sin(b) * (0.09 + 0.08 * uAgentMorph) * mix(1.0, 0.2, uSleep),
+      sin(a) * (0.15 + 0.12 * uAgentMorph) * mix(1.0, 0.35, uSleep)
     );
     lobes = smin(lobes, sdSphere(q - o, 0.08 + 0.02 * sin(t * 2.2 + fi)), 0.1);
   }
 
   float body = smin(core, lobes, 0.13);
 
-  if (uThought > 0.01) {
+  if (uThought > 0.01 && uSleep < 0.7) {
     body = smin(body, sdSphere(q - vec3(0.0, 0.26, 0.0), 0.05 + 0.07 * uThought), 0.08);
   }
 
-  body = smin(body, sdSphere(p - uTrail0, 0.09 * uTrailW.x), 0.16);
-  body = smin(body, sdSphere(p - uTrail1, 0.08 * uTrailW.y), 0.16);
-  body = smin(body, sdSphere(p - uTrail2, 0.07 * uTrailW.z), 0.16);
+  body = smin(body, sdSphere(p - uTrail0, 0.09 * uTrailW.x * mix(1.0, 0.4, uSleep)), 0.16);
+  body = smin(body, sdSphere(p - uTrail1, 0.08 * uTrailW.y * mix(1.0, 0.4, uSleep)), 0.16);
+  body = smin(body, sdSphere(p - uTrail2, 0.07 * uTrailW.z * mix(1.0, 0.4, uSleep)), 0.16);
 
   return body;
+}
+
+vec3 agentLook() {
+  vec3 look = uLookAt - uAgentPos;
+  float ll = length(look);
+  look = ll < 0.001 ? vec3(0.0, 0.0, 1.0) : look / ll;
+  return normalize(mix(look, vec3(0.0, -1.0, 0.12), uSleep * 0.85));
+}
+
+float mapEyes(vec3 p) {
+  vec3 look = agentLook();
+  vec3 upRef = abs(look.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+  vec3 right = normalize(cross(look, upRef));
+  vec3 up = normalize(cross(right, look));
+  float sep = 0.05 + 0.012 * uAffection;
+  float fwd = 0.16 + 0.03 * uAgentPulse;
+  float lift = mix(0.04, -0.012, uSleep);
+  vec3 mid = uAgentPos + look * fwd + up * lift;
+  float r = mix(0.027, 0.035, uAffection);
+  vec3 q1 = p - (mid + right * sep);
+  vec3 q2 = p - (mid - right * sep);
+  float squash = mix(1.0, 3.2, uSleep);
+  q1.y *= squash;
+  q2.y *= squash;
+  float er = r * mix(1.0, 0.42, uSleep);
+  return min(length(q1) - er, length(q2) - er);
 }
 
 float mapVisitor(vec3 p) {
@@ -212,10 +243,12 @@ vec2 map(vec3 p) {
   float w = mapWorld(p);
   float a = mapAgent(p);
   float v = mapVisitor(p);
+  float e = mapEyes(p);
   float d = w;
   float id = 1.0;
   if (a < d) { d = a; id = 2.0; }
   if (v < d) { d = v; id = 3.0; }
+  if (e < d) { d = e; id = 4.0; }
   return vec2(d, id);
 }
 
@@ -364,12 +397,17 @@ void main() {
         }
       }
     } else if (hit.y < 2.5) {
-      vec3 agentCol = hsv(uAgentHue, 0.45, 1.0);
+      vec3 agentCol = hsv(uAgentHue, 0.45 - 0.12 * uAffection, 1.0);
       albedo = agentCol * 0.15;
-      emit = agentCol * (1.15 + 0.8 * uAgentPulse + 0.6 * uThought);
-    } else {
+      emit = agentCol * (1.15 + 0.8 * uAgentPulse + 0.6 * uThought + 0.5 * uAffection);
+      emit *= mix(1.0, 0.4, uSleep);
+    } else if (hit.y < 3.5) {
       albedo = vec3(0.2, 0.55, 0.7);
       emit = vec3(0.35, 0.85, 1.0) * 1.4;
+    } else {
+      albedo = vec3(0.025, 0.03, 0.045);
+      float spark = pow(clamp(dot(n, -rd), 0.0, 1.0), 22.0);
+      emit = vec3(0.92, 0.96, 1.0) * spark * (1.3 + 0.8 * uAffection) * mix(1.0, 0.15, uSleep);
     }
 
     vec3 agentCol = hsv(uAgentHue, 0.5, 1.0);

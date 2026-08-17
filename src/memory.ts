@@ -8,6 +8,8 @@ export type DimpleMemory = {
   companion: string;
   facts: string[];
   chat: ChatLine[];
+  affection: number;
+  lastSeen: number;
 };
 
 const STORE = "raymarch_dimple_memory";
@@ -16,7 +18,7 @@ const MAX_CHAT = 80;
 const MAX_FACTS = 40;
 
 export function emptyMemory(): DimpleMemory {
-  return { companion: "", facts: [], chat: [] };
+  return { companion: "", facts: [], chat: [], affection: 0, lastSeen: 0 };
 }
 
 export function loadMemory(): DimpleMemory {
@@ -39,6 +41,8 @@ export function loadMemory(): DimpleMemory {
             )
             .slice(-MAX_CHAT)
         : [],
+      affection: clamp01(typeof parsed.affection === "number" ? parsed.affection : 0),
+      lastSeen: typeof parsed.lastSeen === "number" ? parsed.lastSeen : 0,
     };
   } catch {
     return emptyMemory();
@@ -50,6 +54,8 @@ function save(mem: DimpleMemory): DimpleMemory {
     companion: mem.companion.trim().slice(0, 40),
     facts: mem.facts.slice(-MAX_FACTS),
     chat: mem.chat.slice(-MAX_CHAT),
+    affection: clamp01(mem.affection),
+    lastSeen: mem.lastSeen || 0,
   };
   localStorage.setItem(STORE, JSON.stringify(next));
   if (next.companion) localStorage.setItem(COMPANION, next.companion);
@@ -109,11 +115,44 @@ export function memoryPacket(): {
   who: string;
   facts: string[];
   recent: { role: string; text: string }[];
+  affection: number;
 } {
   const mem = loadMemory();
   return {
     who: mem.companion || "visitor",
     facts: mem.facts.slice(-16),
     recent: mem.chat.slice(-10).map((l) => ({ role: l.role, text: l.text })),
+    affection: mem.affection,
   };
+}
+
+export function bumpAffection(delta: number): number {
+  const mem = loadMemory();
+  mem.affection = clamp01((mem.affection || 0) + delta);
+  save(mem);
+  return mem.affection;
+}
+
+/** Hours since Dimple last saw you. Updates lastSeen. */
+export function markSeen(): { hoursAway: number; affection: number } {
+  const mem = loadMemory();
+  const prev = mem.lastSeen || 0;
+  const hoursAway = prev > 0 ? Math.max(0, (Date.now() - prev) / 3_600_000) : 0;
+  if (hoursAway > 0.5) {
+    mem.affection = clamp01(mem.affection * Math.exp(-hoursAway * 0.04));
+  }
+  mem.lastSeen = Date.now();
+  save(mem);
+  return { hoursAway, affection: mem.affection };
+}
+
+export function touchSeen(): void {
+  const mem = loadMemory();
+  mem.lastSeen = Date.now();
+  save(mem);
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
 }

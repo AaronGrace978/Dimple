@@ -26,6 +26,9 @@ export type FrameState = {
   trail1: Vec3;
   trail2: Vec3;
   trailW: Vec3;
+  lookAt: Vec3;
+  affection: number;
+  sleep: number;
 };
 
 type Uniforms = {
@@ -46,6 +49,9 @@ type Uniforms = {
   uTrail2: WebGLUniformLocation;
   uTrailW: WebGLUniformLocation;
   uQuality: WebGLUniformLocation;
+  uLookAt: WebGLUniformLocation;
+  uAffection: WebGLUniformLocation;
+  uSleep: WebGLUniformLocation;
 };
 
 export class Renderer {
@@ -91,6 +97,9 @@ export class Renderer {
       uTrail2: loc(gl, this.prog, "uTrail2"),
       uTrailW: loc(gl, this.prog, "uTrailW"),
       uQuality: loc(gl, this.prog, "uQuality"),
+      uLookAt: loc(gl, this.prog, "uLookAt"),
+      uAffection: loc(gl, this.prog, "uAffection"),
+      uSleep: loc(gl, this.prog, "uSleep"),
     };
     this.applyQuality();
   }
@@ -163,6 +172,9 @@ export class Renderer {
     gl.uniform3f(u.uTrail2, state.trail2[0], state.trail2[1], state.trail2[2]);
     gl.uniform3f(u.uTrailW, state.trailW[0], state.trailW[1], state.trailW[2]);
     gl.uniform1f(u.uQuality, this.tier);
+    gl.uniform3f(u.uLookAt, state.lookAt[0], state.lookAt[1], state.lookAt[2]);
+    gl.uniform1f(u.uAffection, state.affection);
+    gl.uniform1f(u.uSleep, state.sleep);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }

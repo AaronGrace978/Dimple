@@ -1,15 +1,17 @@
 import "./style.css";
 import { Presence } from "./agent";
 import { OrbitCamera } from "./camera";
-import { add, scale, type Vec3 } from "./math";
+import { add, rayHitsSphere, scale, type Vec3 } from "./math";
 import {
   appendChat,
   clearMemory,
   loadCompanion,
   loadMemory,
+  markSeen,
   setCompanion,
+  touchSeen,
 } from "./memory";
-import { Mind, type Visitor } from "./mind";
+import { Mind, type FieldSense, type Visitor } from "./mind";
 import {
   PROVIDERS,
   clearKey,
@@ -43,7 +45,7 @@ import {
 } from "./tts";
 import { pollGamepad } from "./controls";
 import { canListen, guardDoubleType, isHoldingTalk, pttStart, pttStop, stopListen, wakeKeyboard } from "./listen";
-import { unlockAudio } from "./audio";
+import { chirp, unlockAudio } from "./audio";
 import { LOCAL_VOICES, localVoice, onVoiceStatus, prepareLocalVoice, setLocalVoice } from "./voice";
 import { onWhisperStatus } from "./whisper";
 import {
@@ -110,6 +112,52 @@ let visitor: Visitor = null;
 let visitorAge = 0;
 let lastSpoken = "";
 let chatting = false;
+let pointerLook: Vec3 | null = null;
+let pointerLookAt = 0;
+let lastMood = "";
+const homecoming = markSeen();
+presence.affection = homecoming.affection;
+let welcomePending = homecoming.hoursAway > 2;
+
+function sense(): FieldSense {
+  return {
+    visitor,
+    cam: camera.pos,
+    chatting: !chatWindow.classList.contains("hidden"),
+  };
+}
+
+function agentRadius(): number {
+  return 0.3 + presence.morph * 0.1 + presence.iso * 0.08;
+}
+
+function lookTarget(time: number): Vec3 {
+  if (presence.mood === "sleep") {
+    return [presence.pos[0], presence.pos[1] - 0.55, presence.pos[2]];
+  }
+  if (visitor && (presence.mood === "play" || presence.mood === "seek")) {
+    return visitor.pos;
+  }
+  if (pointerLook && time - pointerLookAt < 1.8) return pointerLook;
+  return camera.pos;
+}
+
+function noteSpeech(text: string, fromField = false): void {
+  lastSpoken = text;
+  appendChat("dimple", text);
+  if (!chatWindow.classList.contains("hidden")) renderChat();
+  speakDimple(text, fromField);
+}
+
+function petDimple(): void {
+  void unlockAudio();
+  const time = performance.now() / 1000;
+  const waking = mind.asleep();
+  const line = mind.pet(presence, time, camera.pos);
+  presence.applyIntent(mind.tick(presence, time, sense()));
+  noteSpeech(line);
+  chirp(waking ? "wake" : "pet");
+}
 
 function placeVisitor(nx: number, ny: number): void {
   const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
@@ -121,12 +169,32 @@ function placeVisitor(nx: number, ny: number): void {
   if (Math.hypot(hit[0], hit[2]) > 8.6) return;
   visitor = { pos: [hit[0], 0.12, hit[2]] };
   visitorAge = 0;
+  const time = performance.now() / 1000;
+  const waking = mind.asleep();
+  mind.touch(time);
   presence.startle();
-  const intent = mind.tick(presence, performance.now() / 1000, visitor, true);
+  const intent = mind.tick(presence, time, sense(), true);
   presence.applyIntent(intent);
+  if (waking) chirp("wake");
 }
 
-camera.attach(canvas, placeVisitor);
+function onFieldClick(nx: number, ny: number): void {
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const { ro, rd } = camera.rayFromNdc(nx, ny, aspect);
+  const tAgent = rayHitsSphere(ro, rd, presence.pos, agentRadius());
+  let tFloor = -1;
+  if (Math.abs(rd[1]) >= 1e-4) {
+    const t = -ro[1] / rd[1];
+    if (t > 0.05 && t < 40) tFloor = t;
+  }
+  if (tAgent > 0 && (tFloor < 0 || tAgent < tFloor + 0.25)) {
+    petDimple();
+    return;
+  }
+  placeVisitor(nx, ny);
+}
+
+camera.attach(canvas, onFieldClick);
 
 function selectedProvider(): ProviderId {
   return providerById(providerSelect.value).id;
@@ -188,7 +256,7 @@ function renderChat(): void {
 
 function seedDimple(): void {
   if (loadMemory().chat.length > 0) return;
-  appendChat("dimple", "hey. i'm dimple. this field is home. talk to me.");
+  appendChat("dimple", "hey. i'm dimple. this field is home. click me or talk.");
 }
 
 const CHAT_UI = "raymarch_chat_ui";
@@ -326,8 +394,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "HOLD X or L2 talk · A chat · Y follow · B back · STEAM+X keyboard · RS look"
-    : "drag orbit · scroll zoom · HOLD T talk · C chat · S settings · F follow";
+    ? "HOLD X or L2 talk · A chat · Y follow · D-pad up pet · B back"
+    : "drag orbit · scroll zoom · click Dimple to pet · HOLD T talk · C chat · P pet";
 }
 
 function toggleSettings(): void {
@@ -369,7 +437,7 @@ function sendChat(text: string): void {
   renderChat();
   chatting = true;
   void mind
-    .converse(said, presence, performance.now() / 1000, visitor)
+    .converse(said, presence, performance.now() / 1000, sense())
     .then((reply) => {
       appendChat("dimple", reply);
       lastSpoken = reply;
@@ -509,6 +577,9 @@ syncPanel();
 fillTts();
 void fillVoices();
 void prepareLocalVoice().catch(() => undefined);
+window.addEventListener("pagehide", () => {
+  touchSeen();
+});
 window.addEventListener("pointerdown", () => {
   void unlockAudio();
 }, { once: true });
@@ -665,6 +736,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
   if (e.key === "t" || e.key === "T") void beginPtt();
+  if (e.key === "p" || e.key === "P") petDimple();
   if (e.key === "l" || e.key === "L") {
     mind.useLlm = !mind.useLlm && hasMind(mind.provider);
     keyStatus.textContent = mind.useLlm
@@ -679,6 +751,20 @@ window.addEventListener("keyup", (e) => {
   if (e.key === "t" || e.key === "T") void endPtt();
 });
 
+canvas.addEventListener("pointermove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) return;
+  const nx = (e.clientX - rect.left) / rect.width;
+  const ny = (e.clientY - rect.top) / rect.height;
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const { ro, rd } = camera.rayFromNdc(nx, ny, aspect);
+  const tAgent = rayHitsSphere(ro, rd, presence.pos, agentRadius());
+  canvas.style.cursor = tAgent > 0 ? "pointer" : "crosshair";
+  const along = tAgent > 0 ? tAgent : Math.max(0.4, Math.hypot(presence.pos[0] - ro[0], presence.pos[1] - ro[1], presence.pos[2] - ro[2]));
+  pointerLook = add(ro, scale(rd, along));
+  pointerLookAt = performance.now() / 1000;
+});
+
 let last = performance.now();
 
 function frame(now: number): void {
@@ -689,11 +775,25 @@ function frame(now: number): void {
 
   if (visitor) {
     visitorAge += dt;
+    visitor.pos[1] = 0.12 + Math.abs(Math.sin(time * 5.4)) * 0.1;
     if (visitorAge > 14) visitor = null;
   }
 
-  const intent = mind.tick(presence, time, visitor);
+  if (welcomePending && time > 1.5) {
+    welcomePending = false;
+    const name = loadCompanion() || "you";
+    const line =
+      homecoming.hoursAway > 24
+        ? `${name}. the moons went around without you. hi.`
+        : `you were gone. i kept the isolevel warm.`;
+    mind.greet(presence, time, camera.pos, line);
+    noteSpeech(line);
+    chirp("wake");
+  }
+
+  const intent = mind.tick(presence, time, sense());
   presence.applyIntent(intent);
+  presence.gaze(lookTarget(time));
   presence.tick(dt, time);
   camera.tick(presence.pos, dt);
   pollGamepad(camera, {
@@ -712,6 +812,7 @@ function frame(now: number): void {
       void endPtt();
     },
     tapCenter: () => placeVisitor(0.5, 0.62),
+    pet: petDimple,
   }, dt);
 
   const snap = presence.snapshot();
@@ -733,8 +834,14 @@ function frame(now: number): void {
     trail1: snap.trail1,
     trail2: snap.trail2,
     trailW: snap.trailW,
+    lookAt: snap.look,
+    affection: snap.affection,
+    sleep: snap.sleep,
   });
   boot.classList.add("hidden");
+
+  if (snap.mood === "sleep" && lastMood !== "sleep") chirp("sleep");
+  lastMood = snap.mood;
 
   const remote =
     hasMind(mind.provider) && mind.useLlm

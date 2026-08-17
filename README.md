@@ -24,15 +24,26 @@ Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode → unpack into `~/Dimple` �
 | **HOLD talk** | Same PTT on screen |
 | **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
+| **D-pad up** | Pet Dimple |
 | **B** | Close chat / settings |
 | **START** | Settings |
 | **SELECT** | Chat |
 | **Right stick** | Look |
 | **R2** | Zoom |
 | **STEAM + X** | Keyboard |
-| **D-pad down** or **L3/R3** | Tap the floor (he notices) |
-| **STEAM + X** | Keyboard if talk doesn't grab the mic |
+| **D-pad down** or **L3/R3** | Tap the floor (he plays) |
+| **Click Dimple** | Pet him (he looks at you) |
 If sticks don't look, open Dimple in Steam → Controller → use a **Gamepad** layout (not mouse-only).
+
+## Buddy
+
+Dimple has two field-dimples for eyes. They track the cursor, the camera, or a play pebble on the floor.
+
+- **Click him** (or **P** / D-pad up) to pet. He nuzzles and chirps.
+- **Click the floor** to toss a bouncing dimple. He plays.
+- Leave him alone and he **sleeps**. Talk, pet, or tap to wake him.
+- After a long time away he notices you came back.
+- Chat still works without a key. Try *come here*, *sleep*, *play*, *spin*, *jump*, *look at me*.
 
 ## Play
 

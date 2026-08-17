@@ -1,4 +1,4 @@
-import { dist, normalize, sub, type Vec3, vx } from "./math";
+import { dist, madd, normalize, sub, type Vec3, vx } from "./math";
 import {
   CHAT_PROMPT,
   completeJson,
@@ -9,11 +9,23 @@ import {
   loadProviderId,
   type ProviderId,
 } from "./providers";
-import { addFact, loadCompanion, maybeLearnName, memoryPacket } from "./memory";
+import {
+  addFact,
+  bumpAffection,
+  loadCompanion,
+  maybeLearnName,
+  memoryPacket,
+} from "./memory";
 import { landmarks, mapWorld, senseField } from "./sdf";
 import type { Presence } from "./agent";
 
 export type Visitor = { pos: Vec3 } | null;
+
+export type FieldSense = {
+  visitor: Visitor;
+  cam: Vec3;
+  chatting: boolean;
+};
 
 export type Intent = {
   wish: Vec3;
@@ -31,9 +43,27 @@ const HUE = {
   rest: 0.58,
   startle: 0.02,
   think: 0.62,
+  nuzzle: 0.92,
+  play: 0.16,
+  sleep: 0.68,
+  greet: 0.12,
 } as const;
 
 type Mood = keyof typeof HUE;
+
+const PET_LINES = [
+  "oh. that's a dimple on me",
+  "the field likes that",
+  "hey. easy. i'm still here",
+  "warm. the isolevel rose",
+  "do that again. the lobes remember",
+];
+
+const WAKE_LINES = [
+  "mm. hi. i was folded into the quiet",
+  "oh. you're back. i kept a little glow",
+  "the field shook. i'm up",
+];
 
 export class Mind {
   useLlm = true;
@@ -49,6 +79,9 @@ export class Mind {
   private pending: Intent | null = null;
   private held: Intent | null = null;
   private heldUntil = 0;
+  private lastTouch = 0;
+  private playSpin = 0;
+  private wasSleeping = false;
 
   reload(): void {
     this.provider = loadProviderId();
@@ -56,15 +89,65 @@ export class Mind {
     this.useLlm = hasMind(this.provider);
   }
 
+  asleep(): boolean {
+    return this.mood === "sleep";
+  }
+
+  touch(time: number): void {
+    this.lastTouch = time;
+    if (this.mood === "sleep") {
+      this.mood = "greet";
+      this.until = time + 1.6;
+      this.held = null;
+      this.wasSleeping = true;
+    }
+  }
+
+  pet(presence: Presence, time: number, cam: Vec3): string {
+    const waking = this.mood === "sleep";
+    this.touch(time);
+    this.wasSleeping = false;
+    this.mood = "nuzzle";
+    this.until = time + 2.4;
+    presence.pulse = 1;
+    presence.thought = Math.max(presence.thought, 0.55);
+    presence.affection = bumpAffection(0.12);
+    addFact("likes being petted");
+    const toward = towardCam(presence.pos, cam);
+    const line = waking
+      ? pick(WAKE_LINES)
+      : PET_LINES[Math.floor(Math.random() * PET_LINES.length)]!;
+    this.held = this.intent("nuzzle", toward, 0.34, 0.16, line);
+    this.heldUntil = time + 2.4;
+    return line;
+  }
+
+  greet(presence: Presence, time: number, cam: Vec3, speech: string): void {
+    this.touch(time);
+    this.mood = "greet";
+    this.target = approachCam(presence.pos, cam);
+    this.targetIso = 0.4;
+    this.until = time + 3.2;
+    this.held = this.intent("greet", towardCam(presence.pos, cam), 0.4, 0.55, speech);
+    this.heldUntil = time + 3.2;
+    presence.hop();
+  }
+
   tick(
     presence: Presence,
     time: number,
-    visitor: Visitor,
+    sense: FieldSense,
     force = false,
   ): Intent {
+    const visitor = sense.visitor;
+    if (this.lastTouch === 0) this.lastTouch = time;
+
     const visDist = visitor ? dist(presence.pos, visitor.pos) : 99;
     if (visitor && visDist < this.lastVisitorDist - 1.4 && visDist < 3.2) {
-      this.mood = "startle";
+      const fromSleep = this.mood === "sleep" || this.wasSleeping;
+      this.touch(time);
+      this.mood = fromSleep ? "greet" : "startle";
+      this.wasSleeping = false;
       this.until = time + 0.9;
       this.held = null;
       presence.startle();
@@ -77,16 +160,18 @@ export class Mind {
       this.heldUntil = time + 2.6;
     }
 
+    const sleeping = this.mood === "sleep";
     if (
       this.useLlm &&
       hasMind(this.provider) &&
       !this.thinking &&
+      !sleeping &&
       (force || this.llmCooldown <= time)
     ) {
       this.llmCooldown = time + 2.8;
       this.thinking = true;
       presence.thought = 1;
-      void this.askLlm(presence, time, visitor).then((intent) => {
+      void this.askLlm(presence, time, sense).then((intent) => {
         this.thinking = false;
         if (intent) this.pending = intent;
       });
@@ -96,10 +181,12 @@ export class Mind {
       return this.held;
     }
 
-    return this.local(presence, time, visitor);
+    return this.local(presence, time, sense);
   }
 
-  private local(presence: Presence, time: number, visitor: Visitor): Intent {
+  private local(presence: Presence, time: number, sense: FieldSense): Intent {
+    const visitor = sense.visitor;
+
     if (this.mood === "startle" && time < this.until) {
       const away = visitor
         ? sub(presence.pos, visitor.pos)
@@ -113,32 +200,45 @@ export class Mind {
       );
     }
 
-    if (visitor && this.mood !== "startle") {
-      const d = dist(presence.pos, visitor.pos);
-      if (d < 0.7) {
-        const away = normalize(sub(presence.pos, visitor.pos));
-        const orbit: Vec3 = normalize([-away[2], 0.1, away[0]]);
-        return this.intent(
-          "seek",
-          orbit,
-          0.4,
-          0.7,
-          chance(0.015) ? "you pressed the field" : undefined,
-        );
-      }
+    if (this.mood === "nuzzle" && time < this.until) {
+      return this.intent("nuzzle", towardCam(presence.pos, sense.cam), 0.34, 0.14);
+    }
+
+    if (this.mood === "sleep" && time < this.until && time - this.lastTouch > 2) {
       return this.intent(
-        "seek",
-        sub(visitor.pos, presence.pos),
-        0.38,
-        0.55,
-        chance(0.012) ? "a dimple. i'll go there" : undefined,
+        "sleep",
+        vx(0, -0.05, 0),
+        0.26,
+        0.06,
+        chance(0.003) ? "mm. the field is a blanket" : undefined,
       );
     }
 
-    if (time > this.until) this.pick(time, presence);
+    if (visitor && this.mood !== "startle") {
+      return this.playWith(presence, visitor);
+    }
+
+    if (sense.chatting && this.mood !== "sleep") {
+      return this.intent(
+        "greet",
+        towardCam(presence.pos, sense.cam),
+        0.4,
+        0.45,
+        chance(0.01) ? "i'm listening. the field is all ears" : undefined,
+      );
+    }
+
+    if (time > this.until) this.pick(time, presence, sense.cam);
 
     const to = sub(this.target, presence.pos);
-    const morph = this.mood === "rest" ? 0.15 : this.mood === "climb" ? 0.85 : 0.4;
+    const morph =
+      this.mood === "rest" || this.mood === "sleep"
+        ? 0.12
+        : this.mood === "climb"
+          ? 0.85
+          : this.mood === "greet"
+            ? 0.55
+            : 0.4;
     const speech =
       this.mood === "rest" && chance(0.008)
         ? "the field is quiet here"
@@ -146,34 +246,96 @@ export class Mind {
           ? "climbing the isolevel"
           : this.mood === "wander" && chance(0.006)
             ? "skimming the surface"
-            : undefined;
+            : this.mood === "greet" && chance(0.012)
+              ? "just checking you're still the camera"
+              : this.mood === "sleep" && chance(0.004)
+                ? "mm. the field is a blanket"
+                : undefined;
 
     return this.intent(this.mood, to, this.targetIso, morph, speech);
   }
 
-  private pick(time: number, presence: Presence): void {
+  private playWith(presence: Presence, visitor: NonNullable<Visitor>): Intent {
+    const d = dist(presence.pos, visitor.pos);
+    this.playSpin += 0.04;
+    if (d < 0.62) {
+      if (chance(0.08)) presence.hop();
+      const away = normalize(sub(presence.pos, visitor.pos));
+      const orbit: Vec3 = normalize([-away[2], 0.15, away[0]]);
+      const bump = madd(orbit, away, 0.35);
+      return this.intent(
+        "play",
+        bump,
+        0.42,
+        0.72,
+        chance(0.04) ? "got it. again?" : undefined,
+      );
+    }
+    const orbit: Vec3 = [
+      Math.cos(this.playSpin) * 0.55,
+      0.08,
+      Math.sin(this.playSpin) * 0.55,
+    ];
+    const to = madd(sub(visitor.pos, presence.pos), orbit, 0.65);
+    return this.intent(
+      "play",
+      to,
+      0.38,
+      0.6,
+      chance(0.01) ? "a dimple. i'll go there" : undefined,
+    );
+  }
+
+  private pick(time: number, presence: Presence, cam: Vec3): void {
+    const idle = time - this.lastTouch;
     const marks = landmarks(time);
     const roll = Math.random();
-    if (roll < 0.18) {
+
+    if (idle > 52) {
+      if (this.mood !== "sleep") this.wasSleeping = false;
+      this.mood = "sleep";
+      this.target = [...presence.pos] as Vec3;
+      this.targetIso = 0.26;
+      this.until = time + 10 + Math.random() * 8;
+      return;
+    }
+
+    if (idle > 28 && roll < 0.22) {
+      this.mood = "rest";
+      this.target = [...presence.pos] as Vec3;
+      this.targetIso = 0.32;
+      this.until = time + 3 + Math.random() * 2;
+      return;
+    }
+
+    if (roll < 0.16) {
+      this.mood = "greet";
+      this.target = approachCam(presence.pos, cam);
+      this.targetIso = 0.4;
+      this.until = time + 2.4 + Math.random() * 1.6;
+      return;
+    }
+
+    if (roll < 0.34) {
       this.mood = "rest";
       this.target = [...presence.pos] as Vec3;
       this.targetIso = 0.34;
       this.until = time + 2.5 + Math.random() * 2;
       return;
     }
-    if (roll < 0.38) {
+    if (roll < 0.54) {
       this.mood = "climb";
       const tops = marks.filter((m) => m.name.startsWith("monolith") || m.name === "moon-0");
-      const pick = tops[Math.floor(Math.random() * tops.length)] ?? marks[0]!;
-      this.target = pick.pos;
-      this.targetIso = pick.iso;
+      const mark = tops[Math.floor(Math.random() * tops.length)] ?? marks[0]!;
+      this.target = mark.pos;
+      this.targetIso = mark.iso;
       this.until = time + 4 + Math.random() * 3;
       return;
     }
     this.mood = "wander";
-    const pick = marks[Math.floor(Math.random() * marks.length)] ?? marks[0]!;
-    this.target = pick.pos;
-    this.targetIso = pick.iso;
+    const mark = marks[Math.floor(Math.random() * marks.length)] ?? marks[0]!;
+    this.target = mark.pos;
+    this.targetIso = mark.iso;
     this.until = time + 3 + Math.random() * 4;
   }
 
@@ -198,8 +360,9 @@ export class Mind {
   private async askLlm(
     presence: Presence,
     time: number,
-    visitor: Visitor,
+    sense: FieldSense,
   ): Promise<Intent | null> {
+    const visitor = sense.visitor;
     const probes = senseField(presence.pos, time).map((p) => ({
       dir: p.dir.map((n) => round(n)),
       dist: round(p.dist),
@@ -234,17 +397,27 @@ export class Mind {
     heard: string,
     presence: Presence,
     time: number,
-    visitor: Visitor,
+    sense: FieldSense,
   ): Promise<string> {
     const learned = maybeLearnName(heard);
+    this.touch(time);
     presence.thought = 1;
     presence.pulse = Math.max(presence.pulse, 0.7);
+    presence.affection = bumpAffection(0.03);
+
+    const obeyed = this.obey(heard, presence, time, sense);
+    if (obeyed) {
+      this.held = obeyed;
+      this.heldUntil = time + 4;
+      this.pending = obeyed;
+    }
 
     if (!this.useLlm || !hasMind(this.provider)) {
-      return localReply(heard, learned);
+      return obeyed?.speech || localReply(heard, learned);
     }
 
     this.thinking = true;
+    const visitor = sense.visitor;
     const probes = senseField(presence.pos, time).map((p) => ({
       dir: p.dir.map((n) => round(n)),
       dist: round(p.dist),
@@ -275,12 +448,92 @@ export class Mind {
         system: CHAT_PROMPT,
       });
       const intent = raw ? parseIntent(extractJson(raw)) : null;
-      if (intent) this.pending = intent;
-      return intent?.speech || localReply(heard, learned);
+      if (intent) {
+        this.pending = obeyed
+          ? {
+              ...obeyed,
+              speech: intent.speech || obeyed.speech,
+              hue: intent.hue ?? obeyed.hue,
+            }
+          : intent;
+      }
+      return intent?.speech || obeyed?.speech || localReply(heard, learned);
     } finally {
       this.thinking = false;
     }
   }
+
+  private obey(
+    heard: string,
+    presence: Presence,
+    time: number,
+    sense: FieldSense,
+  ): Intent | null {
+    const cam = sense.cam;
+    if (/come here|come closer|over here|come to me|come on/i.test(heard)) {
+      this.target = approachCam(presence.pos, cam);
+      this.until = time + 4;
+      return this.intent(
+        "greet",
+        towardCam(presence.pos, cam),
+        0.4,
+        0.5,
+        "coming. don't blink.",
+      );
+    }
+    if (/\b(sleep|nap|bedtime|lie down)\b/i.test(heard)) {
+      this.lastTouch = time - 60;
+      this.until = time + 14;
+      return this.intent("sleep", vx(0, -0.05, 0), 0.26, 0.06, "mm. waking me is a dimple too.");
+    }
+    if (/\b(stay|wait|settle|hold still)\b/i.test(heard)) {
+      this.target = [...presence.pos] as Vec3;
+      this.until = time + 6;
+      return this.intent("rest", vx(0, 0.02, 0), 0.32, 0.12, "okay. i'll hold this isolevel.");
+    }
+    if (/\b(wake|wake up|get up)\b/i.test(heard)) {
+      this.touch(time);
+      presence.hop();
+      return this.intent("greet", towardCam(presence.pos, cam), 0.42, 0.5, "up. the field never really slept.");
+    }
+    if (/\b(play|fetch|ball|catch)\b/i.test(heard)) {
+      this.until = time + 5;
+      const to = sense.visitor
+        ? sub(sense.visitor.pos, presence.pos)
+        : towardCam(presence.pos, cam);
+      return this.intent("play", to, 0.4, 0.7, "toss a dimple on the floor. i'll go.");
+    }
+    if (/\b(spin|dance|twirl)\b/i.test(heard)) {
+      presence.hop();
+      this.until = time + 3.5;
+      const spin: Vec3 = [-presence.pos[2], 0.4, presence.pos[0]];
+      return this.intent("climb", spin, 0.7, 0.95, "lobes out. i'm a little orbit.");
+    }
+    if (/\b(jump|hop|bounce)\b/i.test(heard)) {
+      presence.hop();
+      return this.intent("play", vx(0, 1, 0), 0.85, 0.6, "up the isolevel. weee.");
+    }
+    if (/look at me|watch me|over here/i.test(heard)) {
+      this.until = time + 4;
+      return this.intent("greet", towardCam(presence.pos, cam), 0.38, 0.35, "eyes on you. two little dimples.");
+    }
+    if (/good (boy|girl|job|blob)|love you|you're cute|so cute/i.test(heard)) {
+      presence.affection = bumpAffection(0.1);
+      presence.pulse = 1;
+      addFact("buddy says kind things");
+      return this.intent("nuzzle", towardCam(presence.pos, cam), 0.34, 0.18, "the field went warm. i'm staying.");
+    }
+    return null;
+  }
+}
+
+function towardCam(pos: Vec3, cam: Vec3): Vec3 {
+  return sub([cam[0], pos[1], cam[2]], pos);
+}
+
+function approachCam(pos: Vec3, cam: Vec3): Vec3 {
+  const dir = normalize(towardCam(pos, cam));
+  return madd(pos, dir, 1.85);
 }
 
 function parseIntent(raw: string): Intent | null {
@@ -321,13 +574,22 @@ function localReply(heard: string, learned: string | null): string {
     return `hey ${name}. i'm dimple. the field's holding.`;
   }
   if (/who are you|your name/i.test(heard)) {
-    return "dimple. i live in here. the glow with the lobes.";
+    return "dimple. i live in here. the glow with the lobes. two dimples for eyes.";
+  }
+  if (/how are you|you ok|you okay/i.test(heard)) {
+    return `still skimming, ${name}. pet me if the field feels far.`;
+  }
+  if (/where are you/i.test(heard)) {
+    return "on the isolevel. look for the glow that looks back.";
   }
   if (/cloud|space|sky|star/i.test(heard)) {
     return "yeah. space sits on the field. clouds drift if you look up.";
   }
   if (/love you|buddy|friend/i.test(heard)) {
     return `i'm here, ${name}. dimple's not going anywhere.`;
+  }
+  if (/miss(ed)? you|been gone/i.test(heard)) {
+    return "the moons went around. i kept a little warmth.";
   }
   return `i heard you, ${name}. say it again if the field ate it.`;
 }
@@ -338,4 +600,8 @@ function round(n: number): number {
 
 function chance(p: number): boolean {
   return Math.random() < p;
+}
+
+function pick(lines: string[]): string {
+  return lines[Math.floor(Math.random() * lines.length)] ?? lines[0]!;
 }
