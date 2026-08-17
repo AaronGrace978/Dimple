@@ -85,6 +85,7 @@ export class Mind {
   private playSpin = 0;
   private wasSleeping = false;
   private lastStain = 0;
+  private seekCamUntil = 0;
 
   reload(): void {
     this.provider = loadProviderId();
@@ -106,7 +107,7 @@ export class Mind {
     }
   }
 
-  pet(presence: Presence, time: number, cam: Vec3): string {
+  pet(presence: Presence, time: number, _cam: Vec3): string {
     const waking = this.mood === "sleep";
     this.touch(time);
     this.wasSleeping = false;
@@ -118,22 +119,21 @@ export class Mind {
     presence.trust = Math.min(1, presence.trust + 0.14);
     addFact("likes being petted");
     stain(presence.pos, 0.9, 0.22);
-    const toward = towardCam(presence.pos, cam);
     const line = waking
       ? pick(WAKE_LINES)
       : PET_LINES[Math.floor(Math.random() * PET_LINES.length)]!;
-    this.held = this.intent("nuzzle", toward, 0.34, 0.16, line);
+    this.held = this.intent("nuzzle", hover(), 0.34, 0.16, line);
     this.heldUntil = time + 2.4;
     return line;
   }
 
-  feelForce(presence: Presence, time: number, strength: number, cam: Vec3): void {
+  feelForce(presence: Presence, time: number, strength: number, _cam: Vec3): void {
     this.touch(time);
     const sudden = strength > 1.6 && presence.trust < 0.28;
     if (sudden) {
       this.mood = "startle";
       this.until = time + 0.7;
-      this.held = this.intent("startle", towardCam(presence.pos, cam), 0.55, 0.9, "the field jumped");
+      this.held = this.intent("startle", hover(), 0.55, 0.9, "the field jumped");
       this.heldUntil = time + 0.7;
       presence.startle();
       stain(presence.pos, -0.7, 0.18);
@@ -144,19 +144,18 @@ export class Mind {
     if (presence.trust > 0.38) {
       this.mood = "trust";
       this.until = time + 1.2;
-      const toward = towardCam(presence.pos, cam);
-      this.held = this.intent("trust", toward, 0.36, 0.22);
+      this.held = this.intent("trust", hover(), 0.36, 0.22);
       this.heldUntil = time + 1.2;
     }
   }
 
-  greet(presence: Presence, time: number, cam: Vec3, speech: string): void {
+  greet(presence: Presence, time: number, _cam: Vec3, speech: string): void {
     this.touch(time);
     this.mood = "greet";
-    this.target = approachCam(presence.pos, cam);
+    this.target = [...presence.pos] as Vec3;
     this.targetIso = 0.4;
     this.until = time + 3.2;
-    this.held = this.intent("greet", towardCam(presence.pos, cam), 0.4, 0.55, speech);
+    this.held = this.intent("greet", hover(), 0.4, 0.55, speech);
     this.heldUntil = time + 3.2;
     presence.hop();
   }
@@ -183,8 +182,10 @@ export class Mind {
     this.lastVisitorDist = visDist;
 
     if (this.pending) {
-      this.held = this.pending;
+      let next = this.pending;
       this.pending = null;
+      if (time >= this.seekCamUntil) next = this.keepInField(next, presence, sense.cam);
+      this.held = next;
       this.heldUntil = time + 2.6;
     }
 
@@ -211,7 +212,13 @@ export class Mind {
     }
 
     if (this.held && time < this.heldUntil && this.mood !== "startle") {
-      return this.held;
+      if (time < this.seekCamUntil) {
+        return {
+          ...this.held,
+          wish: normalize(towardCam(presence.pos, sense.cam)),
+        };
+      }
+      return this.keepInField(this.held, presence, sense.cam);
     }
 
     return this.local(presence, time, sense);
@@ -234,11 +241,11 @@ export class Mind {
     }
 
     if (this.mood === "nuzzle" && time < this.until) {
-      return this.intent("nuzzle", towardCam(presence.pos, sense.cam), 0.34, 0.14);
+      return this.intent("nuzzle", hover(), 0.34, 0.14);
     }
 
     if (this.mood === "trust" && time < this.until) {
-      return this.intent("trust", towardCam(presence.pos, sense.cam), 0.36, 0.2);
+      return this.intent("trust", hover(), 0.36, 0.2);
     }
 
     if (this.mood === "sleep" && time < this.until && time - this.lastTouch > 2) {
@@ -260,7 +267,7 @@ export class Mind {
     if (sense.chatting && this.mood !== "sleep") {
       return this.intent(
         "greet",
-        towardCam(presence.pos, sense.cam),
+        hover(),
         0.4,
         0.45,
         chance(0.01) ? "i'm listening. the field is all ears" : undefined,
@@ -275,7 +282,7 @@ export class Mind {
       );
     }
 
-    if (time > this.until) this.pick(time, presence, sense.cam);
+    if (time > this.until) this.pick(time, presence);
 
     const to = sub(this.target, presence.pos);
     const morph =
@@ -333,7 +340,7 @@ export class Mind {
     );
   }
 
-  private pick(time: number, presence: Presence, cam: Vec3): void {
+  private pick(time: number, presence: Presence): void {
     const idle = time - this.lastTouch;
     const marks = landmarks(time);
     const roll = Math.random();
@@ -357,7 +364,7 @@ export class Mind {
 
     if (roll < 0.14) {
       this.mood = "greet";
-      this.target = approachCam(presence.pos, cam);
+      this.target = [...presence.pos] as Vec3;
       this.targetIso = 0.4;
       this.until = time + 2.4 + Math.random() * 1.6;
       return;
@@ -413,6 +420,11 @@ export class Mind {
       mood === "sleep" ? 0.06 : 0.12,
       speech,
     );
+  }
+
+  private keepInField(intent: Intent, presence: Presence, cam: Vec3): Intent {
+    if (!chasesCam(intent.wish, presence.pos, cam)) return intent;
+    return { ...intent, wish: hover() };
   }
 
   private intent(
@@ -531,7 +543,7 @@ export class Mind {
               speech: intent.speech || obeyed.speech,
               hue: intent.hue ?? obeyed.hue,
             }
-          : intent;
+          : this.keepInField(intent, presence, sense.cam);
       }
       return intent?.speech || obeyed?.speech || localReply(heard, learned);
     } finally {
@@ -549,6 +561,7 @@ export class Mind {
     if (/come here|come closer|over here|come to me|come on/i.test(heard)) {
       this.target = approachCam(presence.pos, cam);
       this.until = time + 4;
+      this.seekCamUntil = time + 4;
       return this.intent(
         "greet",
         towardCam(presence.pos, cam),
@@ -570,13 +583,13 @@ export class Mind {
     if (/\b(wake|wake up|get up)\b/i.test(heard)) {
       this.touch(time);
       presence.hop();
-      return this.intent("greet", towardCam(presence.pos, cam), 0.42, 0.5, "up. the field never really slept.");
+      return this.intent("greet", hover(), 0.42, 0.5, "up. the field never really slept.");
     }
     if (/\b(play|fetch|ball|catch)\b/i.test(heard)) {
       this.until = time + 5;
       const to = sense.visitor
         ? sub(sense.visitor.pos, presence.pos)
-        : towardCam(presence.pos, cam);
+        : hover();
       return this.intent("play", to, 0.4, 0.7, "toss a dimple on the floor. i'll go.");
     }
     if (/\b(spin|dance|twirl)\b/i.test(heard)) {
@@ -591,13 +604,13 @@ export class Mind {
     }
     if (/look at me|watch me|over here/i.test(heard)) {
       this.until = time + 4;
-      return this.intent("greet", towardCam(presence.pos, cam), 0.38, 0.35, "eyes on you. two little dimples.");
+      return this.intent("greet", hover(), 0.38, 0.35, "eyes on you. two little dimples.");
     }
     if (/good (boy|girl|job|blob)|love you|you're cute|so cute/i.test(heard)) {
       presence.affection = bumpAffection(0.1);
       presence.pulse = 1;
       addFact("buddy says kind things");
-      return this.intent("nuzzle", towardCam(presence.pos, cam), 0.34, 0.18, "the field went warm. i'm staying.");
+      return this.intent("nuzzle", hover(), 0.34, 0.18, "the field went warm. i'm staying.");
     }
     return null;
   }
@@ -605,6 +618,18 @@ export class Mind {
 
 function towardCam(pos: Vec3, cam: Vec3): Vec3 {
   return sub([cam[0], pos[1], cam[2]], pos);
+}
+
+function hover(): Vec3 {
+  return vx(0, 0.04, 0);
+}
+
+function chasesCam(wish: Vec3, pos: Vec3, cam: Vec3): boolean {
+  const to = towardCam(pos, cam);
+  const span = Math.hypot(to[0], to[1], to[2]);
+  if (span < 0.4) return false;
+  const w = normalize(wish);
+  return (w[0] * to[0] + w[1] * to[1] + w[2] * to[2]) / span > 0.55;
 }
 
 function approachCam(pos: Vec3, cam: Vec3): Vec3 {

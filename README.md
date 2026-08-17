@@ -14,6 +14,10 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2.3 — stay in the field
+
+He was walking at the camera whenever chat was open (and often when greeting). Follow-cam plus that chase made the whole field slide. Eyes still look at you. Body stays in the world unless you say **come here**.
+
 ## 0.2.2 — a nest, a grove, a map
 
 He has a home now. Northeast of the pool: three dimple-trees (blob canopies on little trunks) and a nest. That is **BASE**. Rest and sleep walk him there. Say *sleep*, *bed*, *nest*, or *go home*.
