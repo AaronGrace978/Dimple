@@ -1,6 +1,6 @@
 import { playPcm } from "./audio";
+import { initKokoro, onSpeechStatus, workerSpeak } from "./speechHub";
 
-const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE_KEY = "raymarch_kokoro_voice";
 
 export const LOCAL_VOICES = [
@@ -17,14 +17,6 @@ export const LOCAL_VOICES = [
 
 type LocalVoiceId = (typeof LOCAL_VOICES)[number]["id"];
 
-type Kokoro = {
-  generate: (
-    text: string,
-    opts: { voice: string; speed?: number },
-  ) => Promise<{ audio: Float32Array; sampling_rate: number }>;
-};
-
-let ttsPromise: Promise<Kokoro> | null = null;
 let status = "voice idle";
 const listeners = new Set<(s: string) => void>();
 
@@ -42,6 +34,10 @@ function emit(s: string): void {
   for (const fn of listeners) fn(s);
 }
 
+onSpeechStatus((s) => {
+  if (/voice|speaking|kokoro/i.test(s)) emit(s);
+});
+
 export function localVoice(): LocalVoiceId {
   const v = localStorage.getItem(VOICE_KEY);
   return LOCAL_VOICES.some((x) => x.id === v) ? (v as LocalVoiceId) : "af_heart";
@@ -51,35 +47,19 @@ export function setLocalVoice(id: string): void {
   if (LOCAL_VOICES.some((x) => x.id === id)) localStorage.setItem(VOICE_KEY, id);
 }
 
-async function loadTts(): Promise<Kokoro> {
-  if (ttsPromise) return ttsPromise;
-  ttsPromise = (async () => {
-    emit("loading voice (first time)…");
-    const mod = await import("kokoro-js");
-    const tts = await mod.KokoroTTS.from_pretrained(MODEL_ID, {
-      dtype: "q8",
-      device: "wasm",
-    });
-    emit("voice ready");
-    return tts as Kokoro;
-  })().catch((err) => {
-    ttsPromise = null;
+export function prepareLocalVoice(): Promise<void> {
+  emit("loading voice (first time)…");
+  return initKokoro().catch((err) => {
     emit(err instanceof Error ? err.message : "voice failed");
     throw err;
   });
-  return ttsPromise;
-}
-
-export function prepareLocalVoice(): Promise<void> {
-  return loadTts().then(() => undefined);
 }
 
 export async function speakLocal(text: string): Promise<void> {
   const line = text.trim();
   if (!line) return;
-  const tts = await loadTts();
   emit("speaking…");
-  const audio = await tts.generate(line, { voice: localVoice(), speed: 1.05 });
-  await playPcm(audio.audio, audio.sampling_rate);
+  const audio = await workerSpeak(line, localVoice());
+  await playPcm(audio.pcm, audio.sampleRate);
   emit("voice ready");
 }

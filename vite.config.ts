@@ -1,4 +1,9 @@
 import { defineConfig, type ProxyOptions } from "vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+const kokoroWeb = path.join(root, "node_modules/kokoro-js/dist/kokoro.web.js");
 
 function to(target: string): ProxyOptions {
   return { target, changeOrigin: true, secure: true };
@@ -33,6 +38,12 @@ export default defineConfig({
     },
   },
   build: { target: "es2022" },
+  worker: { format: "es" },
+  resolve: {
+    alias: {
+      "kokoro-js": kokoroWeb,
+    },
+  },
   optimizeDeps: {
     exclude: ["@huggingface/transformers", "kokoro-js"],
   },

@@ -12,7 +12,7 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 | macOS | `Dimple-*-mac-*.dmg` | Right-click → Open if Gatekeeper complains |
 | Linux / Steam Deck | `Dimple-*-linux-*.AppImage` | Desktop Mode: mark executable, add as a non-Steam game. **F11** fullscreen |
 
-No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
+No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
 ## Steam Deck
 
@@ -20,7 +20,7 @@ Download `Dimple-*-linux-x64.tar.gz`. Desktop Mode → unpack into `~/Dimple` �
 
 | Control | What it does |
 | --- | --- |
-| **HOLD X** or **HOLD L2** | Push-to-talk (local Whisper, same idea as DinoClaw) |
+| **HOLD X** / **L1** / **L2** | Push-to-talk. Does **not** open chat (chat steals the mic / voice). Caption shows listening, then he speaks. |
 | **HOLD talk** | Same PTT on screen |
 | **A** | Open chat. Type with STEAM+X. Does nothing while the box is focused (fixes double-type) |
 | **Y** | Follow Dimple |
@@ -47,7 +47,7 @@ Dimple has two field-dimples for eyes. They track the cursor, the camera, or a p
 
 ## Play
 
-Double-click **Dimple** on your Desktop, or download a build from [Releases](https://github.com/AaronGrace978/RayMarchPrime/releases/tag/v0.1.0). That is a real window, not a browser tab.
+Double-click **Dimple** on your Desktop, or download a build from [Releases](https://github.com/AaronGrace978/RayMarchPrime/releases/tag/v0.1.9). That is a real window, not a browser tab.
 
 On Windows from this folder: double-click `Launch Dimple.cmd`.
 

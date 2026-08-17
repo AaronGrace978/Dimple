@@ -44,10 +44,10 @@ import {
   ttsFieldLines,
 } from "./tts";
 import { pollGamepad } from "./controls";
-import { canListen, guardDoubleType, isHoldingTalk, pttStart, pttStop, stopListen, wakeKeyboard } from "./listen";
+import { canListen, guardDoubleType, isHoldingTalk, pttStart, pttStop, stopListen, wakeKeyboard, warmMic } from "./listen";
 import { chirp, unlockAudio } from "./audio";
 import { LOCAL_VOICES, localVoice, onVoiceStatus, prepareLocalVoice, setLocalVoice } from "./voice";
-import { onWhisperStatus } from "./whisper";
+import { onWhisperStatus, prepareWhisper } from "./whisper";
 import {
   isSteamDeck,
   loadQuality,
@@ -394,8 +394,8 @@ function applyChrome(): void {
   document.body.classList.toggle("deck", deck);
   qualitySelect.value = loadQuality();
   helpKeys.textContent = deck
-    ? "HOLD X or L2 talk · A chat · Y follow · D-pad up pet · B back"
-    : "drag orbit · scroll zoom · click Dimple to pet · HOLD T talk · C chat · P pet";
+    ? "HOLD X / L1 / L2 talk · D-pad up pet · A chat · Y follow"
+    : "drag orbit · click Dimple to pet · HOLD T talk · C chat · P pet";
 }
 
 function toggleSettings(): void {
@@ -405,7 +405,7 @@ function toggleSettings(): void {
   }
 }
 
-function toggleChat(forceOpen = false): void {
+function toggleChat(forceOpen = false, opts?: { focus?: boolean }): void {
   if (forceOpen) chatWindow.classList.remove("hidden");
   else chatWindow.classList.toggle("hidden");
   if (!chatWindow.classList.contains("hidden")) {
@@ -413,10 +413,9 @@ function toggleChat(forceOpen = false): void {
     minBtn.textContent = "min";
     restoreChat();
     renderChat();
-    wakeKeyboard(chatInput);
+    if (opts?.focus !== false) wakeKeyboard(chatInput);
   } else {
-    stopListen();
-    talkBtn.classList.remove("hot");
+    chatInput.blur();
   }
 }
 
@@ -469,7 +468,6 @@ function setTalkUi(label: string, hot: boolean): void {
 
 async function beginPtt(): Promise<void> {
   if (isHoldingTalk()) return;
-  toggleChat(true);
   chatInput.blur();
   if (!canListen()) {
     setTalkUi("no mic", false);
@@ -477,9 +475,13 @@ async function beginPtt(): Promise<void> {
     return;
   }
   setTalkUi("listening", true);
+  speechEl.textContent = "listening… hold X";
+  caption.classList.add("on");
   await pttStart((s) => {
     keyStatus.textContent = s;
-    if (s.startsWith("hold")) setTalkUi("listening", true);
+    speechEl.textContent = s;
+    caption.classList.add("on");
+    if (s.startsWith("hold") || s.startsWith("listening")) setTalkUi("listening", true);
   });
 }
 
@@ -488,6 +490,8 @@ async function endPtt(): Promise<void> {
   setTalkUi("whisper…", true);
   const said = await pttStop((s) => {
     keyStatus.textContent = s;
+    speechEl.textContent = s;
+    caption.classList.add("on");
   });
   setTalkUi("hold talk", false);
   if (said) sendChat(said);
@@ -576,16 +580,23 @@ fillProviders();
 syncPanel();
 fillTts();
 void fillVoices();
-void prepareLocalVoice().catch(() => undefined);
+void prepareWhisper()
+  .then(() => prepareLocalVoice())
+  .catch(() => undefined);
 window.addEventListener("pagehide", () => {
   touchSeen();
 });
 window.addEventListener("pointerdown", () => {
   void unlockAudio();
+  warmMic();
 }, { once: true });
 window.addEventListener("keydown", () => {
   void unlockAudio();
+  warmMic();
 }, { once: true });
+window.addEventListener("gamepadconnected", () => {
+  warmMic();
+});
 seedDimple();
 renderChat();
 restoreChat();
@@ -735,7 +746,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "f" || e.key === "F") camera.follow = !camera.follow;
   if (e.key === "s" || e.key === "S" || e.key === "k" || e.key === "K") toggleSettings();
   if (e.key === "c" || e.key === "C") toggleChat();
-  if (e.key === "t" || e.key === "T") void beginPtt();
+  if (e.key === "t" || e.key === "T" || e.key === "x" || e.key === "X") void beginPtt();
   if (e.key === "p" || e.key === "P") petDimple();
   if (e.key === "l" || e.key === "L") {
     mind.useLlm = !mind.useLlm && hasMind(mind.provider);
@@ -748,7 +759,7 @@ window.addEventListener("keydown", (e) => {
   }
 });
 window.addEventListener("keyup", (e) => {
-  if (e.key === "t" || e.key === "T") void endPtt();
+  if (e.key === "t" || e.key === "T" || e.key === "x" || e.key === "X") void endPtt();
 });
 
 canvas.addEventListener("pointermove", (e) => {
