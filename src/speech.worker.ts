@@ -124,21 +124,33 @@ async function loadWhisper(): Promise<Asr> {
 async function loadKokoro(): Promise<Kokoro> {
   if (tts) return tts;
   status("loading voice (first time)…");
+  // Web build (not the Node entry) so espeak phonemes work in a worker.
   const mod = await import("kokoro-js");
-  const device = await pickDevice();
-  try {
-    tts = (await mod.KokoroTTS.from_pretrained(KOKORO_ID, {
-      dtype: "q8",
-      device,
-    })) as Kokoro;
-  } catch {
-    tts = (await mod.KokoroTTS.from_pretrained(KOKORO_ID, {
-      dtype: "q8",
-      device: "wasm",
-    })) as Kokoro;
-  }
+  // WebGPU output for this model is often noise. WASM is slower and correct.
+  tts = (await mod.KokoroTTS.from_pretrained(KOKORO_ID, {
+    dtype: "q8",
+    device: "wasm",
+  })) as Kokoro;
   status("voice ready");
   return tts;
+}
+
+function copyWave(audio: { audio?: Float32Array; sampling_rate?: number }): {
+  pcm: Float32Array;
+  sampleRate: number;
+} {
+  const src = audio.audio;
+  if (!src || !src.length) throw new Error("kokoro returned no audio");
+  // Must copy. audio.audio is a view onto the ONNX WASM heap; transferring
+  // that buffer plays garbage and detaches the model.
+  const pcm = new Float32Array(src);
+  let peak = 0;
+  for (let i = 0; i < pcm.length; i++) peak = Math.max(peak, Math.abs(pcm[i]!));
+  if (peak > 1.25) {
+    const g = 0.9 / peak;
+    for (let i = 0; i < pcm.length; i++) pcm[i]! *= g;
+  }
+  return { pcm, sampleRate: audio.sampling_rate || 24_000 };
 }
 
 async function transcribe(pcm: Float32Array, sampleRate: number): Promise<string> {
@@ -163,7 +175,7 @@ async function speak(text: string, voice: string): Promise<{ pcm: Float32Array; 
   status("speaking…");
   const audio = await model.generate(text, { voice, speed: 1.05 });
   status("voice ready");
-  return { pcm: audio.audio, sampleRate: audio.sampling_rate };
+  return copyWave(audio);
 }
 
 function handle(msg: InMsg): Promise<void> {
