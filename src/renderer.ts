@@ -33,6 +33,8 @@ export type FrameState = {
   affection: number;
   sleep: number;
   growth: number;
+  chatGrowth: number;
+  playGrowth: number;
   trust: number;
   emotion: Float32Array;
   emotionN: number;
@@ -44,6 +46,8 @@ export type FrameState = {
   guestHue: number;
   guestOn: number;
   guestGrowth: number;
+  guestChat: number;
+  guestPlay: number;
   bead0: Vec3;
   bead1: Vec3;
   bead2: Vec3;
@@ -52,6 +56,8 @@ export type FrameState = {
   handPos: Vec3;
   handOn: number;
   portalOpen: number;
+  dream: Float32Array;
+  dreamN: number;
 };
 
 type Uniforms = {
@@ -80,6 +86,8 @@ type Uniforms = {
   uFearMean: WebGLUniformLocation;
   uJoyMean: WebGLUniformLocation;
   uGrowth: WebGLUniformLocation;
+  uChatGrowth: WebGLUniformLocation;
+  uPlayGrowth: WebGLUniformLocation;
   uTrust: WebGLUniformLocation;
   uGuestPos: WebGLUniformLocation;
   uGuestVel: WebGLUniformLocation;
@@ -87,6 +95,8 @@ type Uniforms = {
   uGuestHue: WebGLUniformLocation;
   uGuestOn: WebGLUniformLocation;
   uGuestGrowth: WebGLUniformLocation;
+  uGuestChat: WebGLUniformLocation;
+  uGuestPlay: WebGLUniformLocation;
   uBead0: WebGLUniformLocation;
   uBead1: WebGLUniformLocation;
   uBead2: WebGLUniformLocation;
@@ -95,6 +105,8 @@ type Uniforms = {
   uHandPos: WebGLUniformLocation;
   uHandOn: WebGLUniformLocation;
   uPortalOpen: WebGLUniformLocation;
+  uDream: WebGLUniformLocation;
+  uDreamN: WebGLUniformLocation;
 };
 
 export class Renderer {
@@ -153,6 +165,8 @@ export class Renderer {
       uFearMean: loc(gl, this.prog, "uFearMean"),
       uJoyMean: loc(gl, this.prog, "uJoyMean"),
       uGrowth: loc(gl, this.prog, "uGrowth"),
+      uChatGrowth: loc(gl, this.prog, "uChatGrowth"),
+      uPlayGrowth: loc(gl, this.prog, "uPlayGrowth"),
       uTrust: loc(gl, this.prog, "uTrust"),
       uGuestPos: loc(gl, this.prog, "uGuestPos"),
       uGuestVel: loc(gl, this.prog, "uGuestVel"),
@@ -160,6 +174,8 @@ export class Renderer {
       uGuestHue: loc(gl, this.prog, "uGuestHue"),
       uGuestOn: loc(gl, this.prog, "uGuestOn"),
       uGuestGrowth: loc(gl, this.prog, "uGuestGrowth"),
+      uGuestChat: loc(gl, this.prog, "uGuestChat"),
+      uGuestPlay: loc(gl, this.prog, "uGuestPlay"),
       uBead0: loc(gl, this.prog, "uBead0"),
       uBead1: loc(gl, this.prog, "uBead1"),
       uBead2: loc(gl, this.prog, "uBead2"),
@@ -168,6 +184,8 @@ export class Renderer {
       uHandPos: loc(gl, this.prog, "uHandPos"),
       uHandOn: loc(gl, this.prog, "uHandOn"),
       uPortalOpen: loc(gl, this.prog, "uPortalOpen"),
+      uDream: loc(gl, this.prog, "uDream[0]"),
+      uDreamN: loc(gl, this.prog, "uDreamN"),
     };
     this.applyQuality();
   }
@@ -257,6 +275,8 @@ export class Renderer {
     gl.uniform1f(u.uFearMean, state.fearMean);
     gl.uniform1f(u.uJoyMean, state.joyMean);
     gl.uniform1f(u.uGrowth, state.growth);
+    gl.uniform1f(u.uChatGrowth, state.chatGrowth);
+    gl.uniform1f(u.uPlayGrowth, state.playGrowth);
     gl.uniform1f(u.uTrust, state.trust);
     gl.uniform3f(u.uGuestPos, state.guestPos[0], state.guestPos[1], state.guestPos[2]);
     gl.uniform3f(u.uGuestVel, state.guestVel[0], state.guestVel[1], state.guestVel[2]);
@@ -264,6 +284,8 @@ export class Renderer {
     gl.uniform1f(u.uGuestHue, state.guestHue);
     gl.uniform1f(u.uGuestOn, state.guestOn);
     gl.uniform1f(u.uGuestGrowth, state.guestGrowth);
+    gl.uniform1f(u.uGuestChat, state.guestChat);
+    gl.uniform1f(u.uGuestPlay, state.guestPlay);
     gl.uniform3f(u.uBead0, state.bead0[0], state.bead0[1], state.bead0[2]);
     gl.uniform3f(u.uBead1, state.bead1[0], state.bead1[1], state.bead1[2]);
     gl.uniform3f(u.uBead2, state.bead2[0], state.bead2[1], state.bead2[2]);
@@ -272,6 +294,8 @@ export class Renderer {
     gl.uniform3f(u.uHandPos, state.handPos[0], state.handPos[1], state.handPos[2]);
     gl.uniform1f(u.uHandOn, state.handOn);
     gl.uniform1f(u.uPortalOpen, state.portalOpen);
+    gl.uniform4fv(u.uDream, state.dream);
+    gl.uniform1f(u.uDreamN, state.dreamN);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }

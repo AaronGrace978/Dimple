@@ -10,6 +10,8 @@ export type GuestBlob = {
   pulse: number;
   thought: number;
   growth: number;
+  chat: number;
+  play: number;
   sleep: number;
   look: Vec3;
   mood: string;
@@ -104,6 +106,8 @@ function parseGuest(raw: unknown): GuestBlob | null {
     pulse: Number(j.pulse) || 0,
     thought: Number(j.thought) || 0,
     growth: Number(j.growth) || 0.3,
+    chat: typeof j.chat === "number" ? j.chat : Number(j.growth) * 0.55 || 0.2,
+    play: typeof j.play === "number" ? j.play : Number(j.growth) * 0.45 || 0.2,
     sleep: Number(j.sleep) || 0,
     look: Array.isArray(j.look)
       ? [Number(j.look[0]) || 0, Number(j.look[1]) || 0.5, Number(j.look[2]) || 0]
