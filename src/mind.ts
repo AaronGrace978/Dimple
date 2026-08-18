@@ -88,6 +88,7 @@ export class Mind {
   private lastStain = 0;
   private seekCamUntil = 0;
   private wakeLine: string | null = null;
+  private lastFieldLine = 0;
 
   reload(): void {
     this.provider = loadProviderId();
@@ -201,11 +202,29 @@ export class Mind {
     this.lastVisitorDist = visDist;
 
     if (this.pending) {
-      let next = this.pending;
+      const next = this.pending;
       this.pending = null;
-      if (time >= this.seekCamUntil) next = this.keepInField(next, presence, sense.cam);
-      this.held = next;
-      this.heldUntil = time + 2.6;
+      if (this.mood === "sleep") {
+        // a late thought while the nest is closed. keep sleeping.
+      } else {
+        const named =
+          typeof next.mood === "string" && next.mood in HUE ? (next.mood as Mood) : this.mood;
+        this.mood = named;
+        if (named === "sleep") {
+          this.until = Math.max(this.until, time + 8);
+          this.target = bedRest();
+          this.held = this.nestIntent(presence, "sleep");
+          this.heldUntil = time + 0.3;
+        } else {
+          let intent = next;
+          if (time >= this.seekCamUntil) intent = this.keepInField(intent, presence, sense.cam);
+          if (intent.speech && !this.takeFieldSlot(time, 12)) {
+            intent = { ...intent, speech: undefined };
+          }
+          this.held = intent;
+          this.heldUntil = time + 2.6;
+        }
+      }
     }
 
     if (time - this.lastStain > 0.85) {
@@ -219,14 +238,16 @@ export class Mind {
       hasMind(this.provider) &&
       !this.thinking &&
       !sleeping &&
+      !sense.chatting &&
       (force || this.llmCooldown <= time)
     ) {
-      this.llmCooldown = time + 2.8;
+      this.llmCooldown = time + 8;
       this.thinking = true;
       presence.thought = 1;
       void this.askLlm(presence, time, sense).then((intent) => {
         this.thinking = false;
-        if (intent) this.pending = intent;
+        if (!intent || this.mood === "sleep") return;
+        this.pending = intent;
       });
     }
 
@@ -268,21 +289,11 @@ export class Mind {
     }
 
     if (this.mood === "sleep" && time < this.until && time - this.lastTouch > 2) {
-      return this.nestIntent(
-        presence,
-        "sleep",
-        chance(0.003)
-          ? dist(presence.pos, bedRest()) > 0.8
-            ? "heading to the nest. that's base."
-            : chance(0.45)
-              ? "mm. the nest is a blanket"
-              : "mm. dreaming the field into a new shape"
-          : undefined,
-      );
+      return this.nestIntent(presence, "sleep", this.sleepMutter(presence, time));
     }
 
     if (visitor && this.mood !== "startle") {
-      return this.playWith(presence, visitor);
+      return this.playWith(presence, visitor, time);
     }
 
     if (sense.chatting && this.mood !== "sleep") {
@@ -291,7 +302,7 @@ export class Mind {
         hover(),
         0.4,
         0.45,
-        chance(0.01) ? "i'm listening. the field is all ears" : undefined,
+        this.fieldLine(time, 48, "i'm listening. the field is all ears"),
       );
     }
 
@@ -299,7 +310,7 @@ export class Mind {
       return this.nestIntent(
         presence,
         "rest",
-        chance(0.006) ? "the grove is quiet. i'll hold this isolevel." : undefined,
+        this.fieldLine(time, 22, "the grove is quiet. i'll hold this isolevel."),
       );
     }
 
@@ -315,24 +326,33 @@ export class Mind {
             ? 0.55
             : 0.4;
     const speech =
-      this.mood === "rest" && chance(0.008)
-        ? "the field is quiet here"
-        : this.mood === "climb" && chance(0.01)
-          ? "climbing the isolevel"
-          : this.mood === "wander" && chance(0.006)
-            ? "skimming the surface"
-            : this.mood === "greet" && chance(0.012)
-              ? "just checking you're still the camera"
-              : this.mood === "sleep" && chance(0.004)
-                ? chance(0.5)
-                  ? "mm. the field is a blanket"
-                  : "processing the day's beads"
+      this.mood === "rest"
+        ? this.fieldLine(time, 22, "the field is quiet here")
+        : this.mood === "climb"
+          ? this.fieldLine(time, 18, "climbing the isolevel")
+          : this.mood === "wander"
+            ? this.fieldLine(time, 16, "skimming the surface")
+            : this.mood === "greet"
+              ? this.fieldLine(time, 20, "just checking you're still the camera")
+              : this.mood === "sleep"
+                ? this.sleepMutter(presence, time)
                 : undefined;
 
     return this.intent(this.mood, to, this.targetIso, morph, speech);
   }
 
-  private playWith(presence: Presence, visitor: NonNullable<Visitor>): Intent {
+  private sleepMutter(presence: Presence, time: number): string | undefined {
+    if (dist(presence.pos, bedRest()) > 0.8) {
+      return this.fieldLine(time, 20, "heading to the nest. that's base.");
+    }
+    return this.fieldLine(
+      time,
+      32,
+      chance(0.5) ? "mm. the nest is a blanket" : "mm. dreaming the field into a new shape",
+    );
+  }
+
+  private playWith(presence: Presence, visitor: NonNullable<Visitor>, time: number): Intent {
     const d = dist(presence.pos, visitor.pos);
     this.playSpin += 0.04;
     if (d < 0.62) {
@@ -345,7 +365,7 @@ export class Mind {
         bump,
         0.42,
         0.72,
-        chance(0.04) ? "got it. again?" : undefined,
+        this.fieldLine(time, 14, "got it. again?"),
       );
     }
     const orbit: Vec3 = [
@@ -359,7 +379,7 @@ export class Mind {
       to,
       0.38,
       0.6,
-      chance(0.01) ? "a dimple. i'll go there" : undefined,
+      this.fieldLine(time, 16, "a dimple. i'll go there"),
     );
   }
 
@@ -448,6 +468,16 @@ export class Mind {
   private keepInField(intent: Intent, presence: Presence, cam: Vec3): Intent {
     if (!chasesCam(intent.wish, presence.pos, cam)) return intent;
     return { ...intent, wish: hover() };
+  }
+
+  private takeFieldSlot(time: number, gap: number): boolean {
+    if (time - this.lastFieldLine < gap) return false;
+    this.lastFieldLine = time;
+    return true;
+  }
+
+  private fieldLine(time: number, gap: number, line: string): string | undefined {
+    return this.takeFieldSlot(time, gap) ? line : undefined;
   }
 
   private intent(
