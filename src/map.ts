@@ -7,6 +7,7 @@ import {
   monolithCenter,
   treeCenter,
 } from "./sdf";
+import { visibleDreams } from "./dream";
 
 const EXTENT = 9.4;
 
@@ -128,6 +129,18 @@ export function drawFieldMap(
       ctx.lineTo(x - 2.5, y);
       ctx.closePath();
       ctx.fill();
+    }
+    for (const m of visibleDreams()) {
+      const [x, y] = xz(m.x, m.z, w, h);
+      if (m.amp > 0) {
+        ctx.fillStyle = "rgba(210, 160, 70, 0.9)";
+        ctx.fillRect(x - 3, y - 3, 6, 6);
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(40, 50, 70, 0.85)";
+        ctx.fill();
+      }
     }
   }
 

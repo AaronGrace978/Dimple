@@ -5,6 +5,7 @@ import {
   dot,
   len,
   madd,
+  mix,
   normalize,
   scale,
   sub,
@@ -27,6 +28,8 @@ export type PresenceState = {
   sleep: number;
   trust: number;
   growth: number;
+  chatGrowth: number;
+  playGrowth: number;
   look: Vec3;
   trail0: Vec3;
   trail1: Vec3;
@@ -48,6 +51,8 @@ export class Presence {
   sleep = 0;
   trust = 0;
   growth = 0.08;
+  chatGrowth = 0.04;
+  playGrowth = 0.04;
   look: Vec3 = vx(0, 0.6, 0);
   wish: Vec3 = vx();
   targetIso = 0.42;
@@ -120,11 +125,12 @@ export class Presence {
     ];
     this.trust = Math.max(0, this.trust - dt * 0.012);
 
-    const accel = 5.8;
+    const accel = 5.8 * (1 + this.playGrowth * 0.28);
     this.vel = madd(this.vel, this.wish, accel * dt);
-    this.vel = scale(this.vel, Math.exp(-dt * 2.1));
+    this.vel = scale(this.vel, Math.exp(-dt * mix(2.1, 1.55, this.playGrowth)));
     const speed = len(this.vel);
-    if (speed > 3.4) this.vel = scale(this.vel, 3.4 / speed);
+    const cap = 3.4 * (1 + this.playGrowth * 0.22);
+    if (speed > cap) this.vel = scale(this.vel, cap / speed);
 
     this.pos = madd(this.pos, this.vel, dt);
 
@@ -136,7 +142,8 @@ export class Presence {
     this.vel = sub(this.vel, scale(n, vn));
 
     this.trailClock += dt;
-    if (this.trailClock > 0.09) {
+    const trailGap = 0.09 * (1 - this.playGrowth * 0.45);
+    if (this.trailClock > trailGap) {
       this.trailClock = 0;
       this.trails.pop();
       this.trails.unshift(copy(this.pos));
@@ -163,6 +170,8 @@ export class Presence {
       sleep: this.sleep,
       trust: this.trust,
       growth: this.growth,
+      chatGrowth: this.chatGrowth,
+      playGrowth: this.playGrowth,
       look: copy(this.look),
       trail0: copy(this.trails[0] ?? this.pos),
       trail1: copy(this.trails[1] ?? this.pos),

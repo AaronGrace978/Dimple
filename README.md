@@ -14,6 +14,12 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2.4 — weather, dreams, branches
+
+Stains used to last forever. Now they weather. Fear softens. Joy settles into warmth. Sleep is generative: Dimple dreams the day's beads and feelings into the landscape — new stones where joy piled up, hollows where fear gathered. You wake to a slightly different field.
+
+Growth splits. Chat-heavy Dimples grow more lobes, richer speech, a wider hue. Play-heavy Dimples grow bigger trails and cover more of the field. Two companions never look the same.
+
 ## 0.2.3 — stay in the field
 
 He was walking at the camera whenever chat was open (and often when greeting). Follow-cam plus that chase made the whole field slide. Eyes still look at you. Body stays in the world unless you say **come here**.
@@ -30,11 +36,12 @@ Mute (HUD, chat **voice**, **M**, D-pad left) now cuts Kokoro mid-sentence. In-f
 
 ## 0.2 — the field remembers
 
-- **Emotional memory.** Fear and joy stain the SDF. Monoliths lean away from scare spots. Crystals dim or bloom. The ground itself warps.
+- **Emotional memory.** Fear and joy stain the SDF, then weather with time. Old fears soften. Old joys become warmth. Monoliths lean away from scare spots. Crystals dim or bloom.
+- **Dreams.** Sleep is not closed eyes. Resting processes beads and stains — growing stones, eroding hollows, rearranging the field.
 - **Thought archaeology.** Each spoken fragment becomes a bead in space. Walk the trails later and read old words in 3D.
 - **Touch.** Drag Dimple (or **HOLD R1 + left stick** on Deck). He startles, then leans in as trust grows. Gyro on the Deck adds a gentle shove.
 - **Voice is a body.** Pitch, speed, and warmth follow mood — startled clips high, rest is slow and warm, thinking pauses mid-line.
-- **Growth.** He starts a flicker. Talk, pet, and push and the field grows more lobes, color, and size. No XP bar.
+- **Growth has branches.** Talk a lot and he grows more lobes and hue. Play a lot and his trails and motion widen. No XP bar.
 - **The field sings.** Distance values drive a small generative pad. Scared worlds sound different from curious ones. It ducks when he talks.
 - **Portal.** Walk the ring. On the same LAN, another Dimple can step into the shared field and the two blobs merge. Alone, you meet an echo of yourself.
 
@@ -71,7 +78,7 @@ Dimple has two field-dimples for eyes. They track the cursor, the camera, or a p
 - **Click him** (or **P** / D-pad up) to pet. He nuzzles and chirps.
 - **Drag him** to apply force. First shoves startle; later he trusts and leans in.
 - **Click the floor** to toss a bouncing dimple. He plays.
-- Leave him alone and he walks back to the **nest** (BASE on the map) and **sleeps**. Talk, pet, or tap to wake him.
+- Leave him alone and he walks back to the **nest** (BASE on the map) and **sleeps**. Sleep dreams the field into a new shape. Talk, pet, or tap to wake him.
 - Chat still works without a key. Try *come here*, *sleep*, *go home*, *play*, *spin*, *jump*, *look at me*.
 
 ## Play

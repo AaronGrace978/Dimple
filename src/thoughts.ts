@@ -108,6 +108,26 @@ export function allBeads(): Bead[] {
   return beads;
 }
 
+/** Dreams drift old words toward the joy that grew from them. */
+export function settleBeads(toward: { x: number; z: number }[], dt: number): void {
+  if (!toward.length || !beads.length) return;
+  const k = Math.min(0.35, dt * 0.09);
+  for (const b of beads) {
+    let best = toward[0]!;
+    let bestD = Infinity;
+    for (const t of toward) {
+      const d = (b.pos[0] - t.x) ** 2 + (b.pos[2] - t.z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    if (bestD < 0.2) continue;
+    b.pos[0] += (best.x - b.pos[0]) * k;
+    b.pos[2] += (best.z - b.pos[2]) * k;
+  }
+}
+
 export function nearestBeads(from: Vec3, n = 4): Bead[] {
   return [...beads]
     .sort((a, b) => dist(a.pos, from) - dist(b.pos, from))

@@ -18,6 +18,7 @@ import {
 } from "./memory";
 import { landmarks, mapWorld, senseField, bedRest } from "./sdf";
 import { moodValence, stain } from "./emotion";
+import { consumeDreamNote } from "./dream";
 import type { Presence } from "./agent";
 
 export type Visitor = { pos: Vec3 } | null;
@@ -86,6 +87,7 @@ export class Mind {
   private wasSleeping = false;
   private lastStain = 0;
   private seekCamUntil = 0;
+  private wakeLine: string | null = null;
 
   reload(): void {
     this.provider = loadProviderId();
@@ -100,11 +102,18 @@ export class Mind {
   touch(time: number): void {
     this.lastTouch = time;
     if (this.mood === "sleep") {
+      this.wakeLine = consumeDreamNote() ?? this.wakeLine;
       this.mood = "greet";
       this.until = time + 1.6;
       this.held = null;
       this.wasSleeping = true;
     }
+  }
+
+  takeWakeLine(): string | null {
+    const line = this.wakeLine;
+    this.wakeLine = null;
+    return line;
   }
 
   pet(presence: Presence, time: number, _cam: Vec3): string {
@@ -119,9 +128,12 @@ export class Mind {
     presence.trust = Math.min(1, presence.trust + 0.14);
     addFact("likes being petted");
     stain(presence.pos, 0.9, 0.22);
-    const line = waking
-      ? pick(WAKE_LINES)
-      : PET_LINES[Math.floor(Math.random() * PET_LINES.length)]!;
+    const dreamed = this.takeWakeLine();
+    const line = dreamed
+      ? dreamed
+      : waking
+        ? pick(WAKE_LINES)
+        : PET_LINES[Math.floor(Math.random() * PET_LINES.length)]!;
     this.held = this.intent("nuzzle", hover(), 0.34, 0.16, line);
     this.heldUntil = time + 2.4;
     return line;
@@ -178,6 +190,13 @@ export class Mind {
       this.until = time + 0.9;
       this.held = null;
       presence.startle();
+      if (fromSleep) {
+        const dreamed = this.takeWakeLine();
+        if (dreamed) {
+          this.held = this.intent("greet", hover(), 0.4, 0.5, dreamed);
+          this.heldUntil = time + 2.8;
+        }
+      }
     }
     this.lastVisitorDist = visDist;
 
@@ -255,7 +274,9 @@ export class Mind {
         chance(0.003)
           ? dist(presence.pos, bedRest()) > 0.8
             ? "heading to the nest. that's base."
-            : "mm. the nest is a blanket"
+            : chance(0.45)
+              ? "mm. the nest is a blanket"
+              : "mm. dreaming the field into a new shape"
           : undefined,
       );
     }
@@ -303,7 +324,9 @@ export class Mind {
             : this.mood === "greet" && chance(0.012)
               ? "just checking you're still the camera"
               : this.mood === "sleep" && chance(0.004)
-                ? "mm. the field is a blanket"
+                ? chance(0.5)
+                  ? "mm. the field is a blanket"
+                  : "processing the day's beads"
                 : undefined;
 
     return this.intent(this.mood, to, this.targetIso, morph, speech);
@@ -583,7 +606,14 @@ export class Mind {
     if (/\b(wake|wake up|get up)\b/i.test(heard)) {
       this.touch(time);
       presence.hop();
-      return this.intent("greet", hover(), 0.42, 0.5, "up. the field never really slept.");
+      const dreamed = this.takeWakeLine();
+      return this.intent(
+        "greet",
+        hover(),
+        0.42,
+        0.5,
+        dreamed ?? "up. the field never really slept.",
+      );
     }
     if (/\b(play|fetch|ball|catch)\b/i.test(heard)) {
       this.until = time + 5;
@@ -605,6 +635,15 @@ export class Mind {
     if (/look at me|watch me|over here/i.test(heard)) {
       this.until = time + 4;
       return this.intent("greet", hover(), 0.38, 0.35, "eyes on you. two little dimples.");
+    }
+    if (/\b(dream|dreamed|dreaming)\b/i.test(heard)) {
+      return this.intent(
+        "think",
+        hover(),
+        0.36,
+        0.22,
+        "sleep isn't closed eyes. i rearrange the field. old joy becomes stone.",
+      );
     }
     if (/good (boy|girl|job|blob)|love you|you're cute|so cute/i.test(heard)) {
       presence.affection = bumpAffection(0.1);
@@ -685,6 +724,9 @@ function localReply(heard: string, learned: string | null): string {
   }
   if (/bed|nest|base|grove|home\b/i.test(heard)) {
     return "northeast, under the dimple-trees. the nest is base. say sleep and i'll go.";
+  }
+  if (/dream|forget|stain|weather/i.test(heard)) {
+    return "feelings don't stay sharp. sleep rearranges them. i wake to a slightly different field.";
   }
   if (/tree|forest/i.test(heard)) {
     return "blob trees on little trunks. they keep the nest quiet.";

@@ -12,9 +12,10 @@ import {
   touchSeen,
 } from "./memory";
 import { Mind, type FieldSense, type Visitor } from "./mind";
-import { clearEmotion, packEmotions } from "./emotion";
-import { bumpGrowth, clearGrowth, growthLabel, loadGrowth } from "./growth";
+import { clearEmotion, packEmotions, tickEmotion } from "./emotion";
+import { bumpChat, bumpPlay, clearGrowth, growthLabel, loadGrowth, loadShape } from "./growth";
 import { dropBead, packBeads, clearThoughts } from "./thoughts";
+import { clearDreams, packDreams, tickDream } from "./dream";
 import { fieldSings, setFieldSings, tickMusic } from "./fieldMusic";
 import {
   beacon,
@@ -145,8 +146,15 @@ let handOn = 0;
 let lastBead = "";
 const homecoming = markSeen();
 presence.affection = homecoming.affection;
-presence.growth = loadGrowth();
+syncGrowth();
 let welcomePending = homecoming.hoursAway > 2;
+
+function syncGrowth(): void {
+  const shape = loadShape();
+  presence.growth = loadGrowth();
+  presence.chatGrowth = shape.chat;
+  presence.playGrowth = shape.play;
+}
 
 function sense(): FieldSense {
   return {
@@ -157,7 +165,13 @@ function sense(): FieldSense {
 }
 
 function agentRadius(): number {
-  return 0.16 + presence.growth * 0.22 + presence.morph * 0.08 + presence.iso * 0.06;
+  return (
+    0.16 +
+    presence.growth * 0.14 +
+    presence.playGrowth * 0.14 +
+    presence.morph * 0.08 +
+    presence.iso * 0.06
+  );
 }
 
 function lookTarget(time: number): Vec3 {
@@ -184,7 +198,8 @@ function petDimple(): void {
   const waking = mind.asleep();
   const line = mind.pet(presence, time, camera.pos);
   presence.applyIntent(mind.tick(presence, time, sense()));
-  presence.growth = bumpGrowth(0.018);
+  presence.growth = bumpPlay(0.018);
+  syncGrowth();
   noteSpeech(line);
   chirp(waking ? "wake" : "pet");
 }
@@ -203,9 +218,15 @@ function placeVisitor(nx: number, ny: number): void {
   const waking = mind.asleep();
   mind.touch(time);
   presence.startle();
+  bumpPlay(0.01);
+  syncGrowth();
   const intent = mind.tick(presence, time, sense(), true);
   presence.applyIntent(intent);
-  if (waking) chirp("wake");
+  if (waking) {
+    const dreamed = mind.takeWakeLine();
+    if (dreamed) noteSpeech(dreamed);
+    chirp("wake");
+  }
 }
 
 function onFieldClick(nx: number, ny: number): void {
@@ -399,7 +420,8 @@ function speakDimple(text: string, fromField = false): void {
   if (text && text !== lastBead) {
     lastBead = text;
     dropBead(presence.pos, text, presence.mood, presence.hue);
-    bumpGrowth(0.012);
+    bumpChat(0.012);
+    syncGrowth();
   }
 }
 
@@ -568,8 +590,8 @@ function sendChat(text: string): void {
       });
       renderChat();
       speakDimple(reply);
-      bumpGrowth(0.02);
-      presence.growth = loadGrowth();
+      bumpChat(0.02);
+      syncGrowth();
     })
     .finally(() => {
       chatting = false;
@@ -804,7 +826,8 @@ document.querySelector("#clear-memory")!.addEventListener("click", () => {
   clearEmotion();
   clearThoughts();
   clearGrowth();
-  presence.growth = loadGrowth();
+  clearDreams();
+  syncGrowth();
   seedDimple();
   renderChat();
   companionInput.value = "";
@@ -970,6 +993,8 @@ function frame(now: number): void {
   presence.applyIntent(intent);
   presence.gaze(lookTarget(time));
   presence.tick(dt, time);
+  tickEmotion(presence.sleep);
+  tickDream(presence.sleep, dt);
   camera.tick(presence.pos, dt);
   pollGamepad(camera, {
     chatOpen: () => !chatWindow.classList.contains("hidden"),
@@ -1004,9 +1029,11 @@ function frame(now: number): void {
   }, dt);
 
   handOn = Math.max(0, handOn - dt * 1.8);
+  syncGrowth();
   const snap = presence.snapshot();
   const visitorPos: Vec3 = visitor?.pos ?? [0, 0, 0];
   const feelings = packEmotions();
+  const dreams = packDreams();
   const beads = paintThoughts(snap.pos);
   const selfNear = nearPortal(snap.pos);
   const guest = currentGuest(selfNear);
@@ -1020,6 +1047,8 @@ function frame(now: number): void {
     pulse: snap.pulse,
     thought: snap.thought,
     growth: snap.growth,
+    chat: snap.chatGrowth,
+    play: snap.playGrowth,
     sleep: snap.sleep,
     look: snap.look,
     mood: snap.mood,
@@ -1035,6 +1064,8 @@ function frame(now: number): void {
       pulse: snap.pulse,
       thought: snap.thought,
       growth: snap.growth,
+      chat: snap.chatGrowth,
+      play: snap.playGrowth,
       sleep: snap.sleep,
       look: snap.look,
       mood: snap.mood,
@@ -1071,6 +1102,8 @@ function frame(now: number): void {
     affection: snap.affection,
     sleep: snap.sleep,
     growth: snap.growth,
+    chatGrowth: snap.chatGrowth,
+    playGrowth: snap.playGrowth,
     trust: snap.trust,
     emotion: feelings.data,
     emotionN: feelings.count,
@@ -1082,6 +1115,8 @@ function frame(now: number): void {
     guestHue: guest?.hue ?? 0.62,
     guestOn: guest ? 1 : 0,
     guestGrowth: guest?.growth ?? 0.3,
+    guestChat: guest?.chat ?? 0.2,
+    guestPlay: guest?.play ?? 0.2,
     bead0: beads.p0,
     bead1: beads.p1,
     bead2: beads.p2,
@@ -1090,6 +1125,8 @@ function frame(now: number): void {
     handPos,
     handOn,
     portalOpen,
+    dream: dreams.data,
+    dreamN: dreams.count,
   });
   boot.classList.add("hidden");
 
@@ -1105,7 +1142,7 @@ function frame(now: number): void {
   const field =
     qualityTier() === 0 ? " · deck" : qualityTier() === 3 ? " · supreme" : "";
   const guestNote = guest ? ` · ${portalStatus(guest)}` : selfNear ? " · portal open" : "";
-  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${growthLabel(snap.growth)} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}${guestNote}`;
+  statsEl.textContent = `dimple · iso ${snap.iso.toFixed(2)} · ${snap.mood} · ${growthLabel(snap.growth, loadShape())} · ${remote} · ${Math.round(renderer.fps)}fps · ${renderer.canvasWidth}x${renderer.canvasHeight} · ${shortGpu()}${field}${guestNote}`;
   drawFieldMap(minimap, {
     dimple: snap.pos,
     you: camera.pos,

@@ -1,5 +1,6 @@
 import { add, copy, type Vec3, vx } from "./math";
 import { feelXZ } from "./emotion";
+import { dreamGround, dreamLandmarks, visibleDreams } from "./dream";
 
 function sdOctahedron(p: Vec3, s: number): number {
   return (Math.abs(p[0]) + Math.abs(p[1]) + Math.abs(p[2]) - s) * 0.57735027;
@@ -18,7 +19,7 @@ export function crystalCenter(i: number): Vec3 {
   return [Math.cos(a) * 5.25, 0.62, Math.sin(a) * 5.25];
 }
 
-/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 4 */
+/** Keep in lockstep with src/shaders/frag.glsl — SCENE REV 5 */
 
 export const FOV = 1.15;
 
@@ -145,7 +146,7 @@ export function mapWorld(p: Vec3, time: number): number {
   const hills = 0.62 * Math.sin(p[0] * 0.21 + 0.7) * Math.sin(p[2] * 0.18 - 0.4);
   const t = Math.min(1, Math.max(0, (r - 8.2) / (13.5 - 8.2)));
   const feel = feelXZ(p[0], p[2]);
-  let d = p[1] - hills * t - feel.joy * 0.07 + feel.fear * 0.03;
+  let d = p[1] - hills * t - feel.joy * 0.07 + feel.fear * 0.03 - dreamGround(p[0], p[2]);
 
   d = Math.min(d, Math.max(Math.abs(p[1] - 0.025) - 0.02, r - 1.12));
   d = Math.min(d, sdCappedCylinder([p[0], p[1] - 0.06, p[2]], 0.06, 1.28));
@@ -199,7 +200,24 @@ export function mapWorld(p: Vec3, time: number): number {
 
   d = Math.min(d, mapTrees(p));
   d = Math.min(d, mapBed(p));
+  d = Math.min(d, mapDream(p));
 
+  return d;
+}
+
+function mapDream(p: Vec3): number {
+  let d = 1e5;
+  for (const m of visibleDreams()) {
+    if (m.amp <= 0.05) continue;
+    const h = 0.38 + m.amp * 0.55;
+    const s = 0.16 + m.amp * 0.14;
+    const cy = 0.42 + m.amp * 0.55;
+    d = Math.min(d, sdBox([p[0] - m.x, p[1] - cy, p[2] - m.z], [s, h, s]));
+    d = Math.min(
+      d,
+      sdSphere([p[0] - m.x, p[1] - (cy + 0.42 + m.amp * 0.2), p[2] - m.z], 0.08 + m.amp * 0.06),
+    );
+  }
   return d;
 }
 
@@ -269,6 +287,7 @@ export function landmarks(time: number): Landmark[] {
     pos: moonCenter(0, time),
     iso: 0.5,
   });
+  for (const mark of dreamLandmarks()) list.push(mark);
   return list;
 }
 
