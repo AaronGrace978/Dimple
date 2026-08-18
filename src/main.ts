@@ -1157,11 +1157,7 @@ function frame(now: number): void {
     caption.classList.toggle("on", ttsEnabled());
     if (snap.speech !== lastSpoken) {
       lastSpoken = snap.speech;
-      if (ttsEnabled()) {
-        appendChat("dimple", snap.speech);
-        if (!chatWindow.classList.contains("hidden")) renderChat();
-        speakDimple(snap.speech, true);
-      }
+      if (ttsEnabled()) speakDimple(snap.speech, true);
     }
   } else {
     caption.classList.remove("on");
