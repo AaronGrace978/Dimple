@@ -392,6 +392,34 @@ vec3 agentLook() {
   return normalize(mix(look, vec3(0.0, -1.0, 0.12), uSleep * 0.85));
 }
 
+// Tiny pieces of the field that Dimple has gathered over time. They stay close
+// when he sleeps, fan out when he plays, and briefly lag behind quick movement.
+vec3 kindredSpark(int i) {
+  float fi = float(i);
+  float play = clamp(uPlayGrowth, 0.0, 1.0);
+  float chat = clamp(uChatGrowth, 0.0, 1.0);
+  float grown = clamp(uGrowth, 0.0, 1.0);
+  float sleep = clamp(uSleep, 0.0, 1.0);
+  float golden = fi * 2.3999632;
+  float drift = uTime * mix(0.34, 0.72, play) * (mod(fi, 2.0) < 0.5 ? 1.0 : -0.72);
+  float orbit = mix(0.25, 0.48 + 0.2 * play, grown);
+  orbit *= mix(1.0, 0.52, sleep);
+  float breathe = 0.04 * sin(uTime * 1.7 + fi * 1.31);
+  vec3 offset = vec3(
+    cos(golden + drift) * (orbit + breathe),
+    0.08 + sin(golden * 0.7 + drift * 1.4) * (0.16 + 0.09 * chat),
+    sin(golden + drift) * (orbit + breathe)
+  );
+  offset.y = mix(offset.y, 0.04 + 0.09 * sin(uTime * 0.55 + fi), sleep);
+  float lag = (0.018 + 0.018 * mod(fi, 3.0)) * mix(0.35, 1.0, play);
+  return uAgentPos + offset - uAgentVel * lag;
+}
+
+float rayPointDistance(vec3 ro, vec3 rd, vec3 point, float maxT) {
+  float along = clamp(dot(point - ro, rd), 0.0, maxT);
+  return length(ro + rd * along - point);
+}
+
 float mapEyes(vec3 p) {
   vec3 look = agentLook();
   vec3 upRef = abs(look.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
@@ -512,6 +540,8 @@ void main() {
   float lampGlow = 0.0;
   float portalGlow = 0.0;
   float nestGlow = 0.0;
+  float kindredGlow = 0.0;
+  float kindredCore = 0.0;
   vec2 hit = vec2(1e5, 0.0);
   bool found = false;
 
@@ -542,6 +572,18 @@ void main() {
 
   vec3 col = sky(rd);
   vec3 p = ro + rd * t;
+  float sparkDepth = found ? t + 0.08 : 55.0;
+  int sparkN = uQuality < 0.5 ? 3 : (uQuality < 1.5 ? 5 : 8);
+  for (int i = 0; i < 8; i++) {
+    if (i >= sparkN) break;
+    vec3 spark = kindredSpark(i);
+    float sd = rayPointDistance(ro, rd, spark, sparkDepth);
+    float flicker = 0.72 + 0.28 * sin(uTime * (2.1 + float(i) * 0.11) + float(i) * 4.7);
+    float firstSpark = i == 0 ? 0.25 : 0.0;
+    float life = mix(0.42, 1.0, clamp(uGrowth * 1.5 + firstSpark, 0.0, 1.0));
+    kindredGlow += flicker * life * 0.0007 / (0.0008 + sd * sd);
+    kindredCore += flicker * life * smoothstep(0.018, 0.0025, sd);
+  }
 
   if (found) {
     vec3 n = calcNormal(p);
@@ -607,8 +649,14 @@ void main() {
       float chat = clamp(uChatGrowth, 0.0, 1.0);
       float hue = 0.48 + (uAgentHue - 0.48) * mix(0.42, 1.28, chat);
       vec3 agentCol = hsv(hue, mix(0.32, 0.62, chat) - 0.12 * uAffection, mix(0.55, 1.0, uGrowth));
-      albedo = agentCol * 0.15;
-      emit = agentCol * (1.15 + 0.8 * uAgentPulse + 0.6 * uThought + 0.5 * uAffection);
+      float livingVein = 0.5 + 0.5 * sin(
+        length(p - uAgentPos) * 48.0 -
+        uTime * (2.0 + uAgentPulse * 2.6) +
+        fbm((p - uAgentPos) * 7.0) * 5.0
+      );
+      livingVein = smoothstep(0.73, 0.98, livingVein) * mix(0.35, 1.0, uThought + uAffection);
+      albedo = agentCol * (0.15 + livingVein * 0.07);
+      emit = agentCol * (1.15 + 0.8 * uAgentPulse + 0.6 * uThought + 0.5 * uAffection + livingVein * 0.65);
       emit *= mix(1.0, 0.4, uSleep);
       emit *= mix(0.55, 1.0, 0.4 + 0.6 * uGrowth);
     } else if (hit.y < 3.5) {
@@ -668,6 +716,14 @@ void main() {
   col += vec3(1.0, 0.72, 0.35) * min(lampGlow * 0.04, 1.1);
   col += vec3(0.35, 0.7, 1.0) * min(portalGlow * (0.035 + 0.05 * uPortalOpen), 1.2);
   col += vec3(0.7, 0.28, 0.45) * min(nestGlow * (0.02 + 0.06 * uSleep), 1.0);
+  vec3 kindredCol = mix(
+    hsv(uAgentHue + 0.08 + 0.08 * uThought, 0.48, 1.0),
+    vec3(1.0, 0.7, 0.36),
+    clamp(uAffection * 0.55 + uAgentPulse * 0.18, 0.0, 0.72)
+  );
+  kindredCol = mix(kindredCol, vec3(0.42, 0.56, 1.0), uSleep * 0.62);
+  col += kindredCol * min(kindredGlow * (0.16 + 0.08 * uThought), 1.35);
+  col += mix(kindredCol, vec3(1.0), 0.55) * min(kindredCore * 0.72, 1.6);
 
   float fog = 1.0 - exp(-0.0007 * t * t);
   col = mix(col, sky(rd), found ? fog : 0.0);
