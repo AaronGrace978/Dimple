@@ -14,6 +14,10 @@ GitHub Releases ship **Windows**, **macOS**, and **Linux** (Steam Deck) builds.
 
 No `.env`. Dimple **speaks locally** with Kokoro (same idea as DinoClaw) — no ElevenLabs key required. Whisper + Kokoro run on a **Web Worker** so the field keeps moving. First talk downloads the voice model (~80 MB, once, needs Wi-Fi). Bind a mind key in Settings if you want him thinking.
 
+## 0.2.6
+
+Same quiet field as 0.2.5. Fresh Steam Deck cut: download `Dimple-0.2.6-linux-x64.tar.gz` (~426 MB). Unpack into `~/Dimple` and run `/home/deck/Dimple/Dimple --no-sandbox`.
+
 ## 0.2.5 — sleep is quiet
 
 Open chat used to keep his mind "awake" while the HUD said sleep. A bound model then wrote the same nest-dream into chat, over and over, mixed with *i'm listening*. Field mutter stays in the caption (and in voice only if you turn on **also speak field lines**). Chat is for talking to him. Sleep stays a dream.
