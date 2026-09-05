@@ -1,22 +1,112 @@
 Copyright (c) 2026 Aaron Grace. All rights reserved.
 
-PROPRIETARY SOFTWARE
+==============================================================================
+DIMPLE / RAYMARCHPRIME — PROPRIETARY SOFTWARE LICENSE AND LEGAL NOTICE
+==============================================================================
 
-This software and associated documentation files (the "Software") are the
-exclusive property of Aaron Grace. The Software is proprietary and confidential.
+Owner: Aaron Grace (the "Owner")
+Software: Dimple, RayMarchPrime, and all related source code, object code,
+shaders, assets, documentation, build scripts, configuration, designs,
+algorithms, and other materials in this repository (collectively, the
+"Software").
 
-No license is granted to any person to use, copy, modify, merge, publish,
-distribute, sublicense, sell, or otherwise deal in the Software, in whole or
-in part, except as expressly authorized in a separate written agreement with
-the copyright holder.
+1. OWNERSHIP; NO LICENSE GRANTED
 
-Unauthorized use, reproduction, or distribution of this Software, or any
-portion of it, may result in severe civil and criminal penalties, and will be
-prosecuted to the maximum extent possible under law.
+The Software is the exclusive property of the Owner and is protected by
+United States copyright law, the Massachusetts Uniform Trade Secrets Act
+(M.G.L. c. 93, §§ 42–42G), and other applicable intellectual-property and
+unfair-competition laws. The Software is proprietary and confidential.
+
+EXCEPT AS EXPRESSLY AUTHORIZED IN A SEPARATE WRITTEN AGREEMENT SIGNED BY THE
+OWNER, NO LICENSE — EXPRESS, IMPLIED, BY ESTOPPEL, OR OTHERWISE — IS GRANTED
+TO ANY PERSON OR ENTITY TO USE, ACCESS, VIEW FOR THE PURPOSE OF COPYING,
+COPY, REPRODUCE, MODIFY, EDIT, ADAPT, TRANSLATE, CREATE DERIVATIVE WORKS
+FROM, MERGE, PUBLISH, DISTRIBUTE, PUBLICLY DISPLAY, PUBLICLY PERFORM,
+SUBLICENSE, SELL, RENT, LEASE, LOAN, TRANSFER, REVERSE ENGINEER, DECOMPILE,
+DISASSEMBLE, OR OTHERWISE EXPLOIT THE SOFTWARE, IN WHOLE OR IN PART.
+
+Mere availability of this repository or of binary builds does not constitute
+permission to copy, edit, fork, republish, or reuse the Software.
+
+2. PROHIBITED CONDUCT
+
+Without a signed written license from the Owner, the following are strictly
+prohibited and constitute infringement and/or misappropriation:
+
+  (a) copying, cloning, forking, mirroring, or downloading the Software for
+      any purpose other than personal evaluation of an official binary build
+      distributed by the Owner, if any;
+  (b) editing, modifying, patching, or creating derivative works based on
+      the Software (including shaders, source, assets, and documentation);
+  (c) redistributing source or binaries, whether modified or unmodified;
+  (d) incorporating any portion of the Software into another product,
+      service, game, library, model, or repository;
+  (e) removing, altering, or obscuring copyright, proprietary, or legal
+      notices; and
+  (f) using the Software to train, fine-tune, or distill any machine-learning
+      or generative model without prior written consent.
+
+3. PENALTIES AND REMEDIES
+
+UNAUTHORIZED COPYING, EDITING, MODIFICATION, DISTRIBUTION, OR OTHER USE OF
+THE SOFTWARE WILL BE PROSECUTED TO THE FULLEST EXTENT OF THE LAW.
+
+Violators may be subject to, without limitation:
+
+  (a) Civil copyright remedies under Title 17 of the United States Code,
+      including actual damages, disgorgement of profits, and/or statutory
+      damages of up to $150,000 per work for willful infringement, plus costs
+      and attorneys' fees where permitted;
+  (b) Injunctive and other equitable relief (temporary, preliminary, and
+      permanent) without the need to post a bond to the extent permitted by
+      law;
+  (c) Trade-secret remedies under Massachusetts law, including injunctive
+      relief, actual damages, unjust enrichment, and exemplary damages of up
+      to twice actual damages for willful and malicious misappropriation,
+      plus attorneys' fees where authorized;
+  (d) Criminal penalties for willful copyright infringement under
+      17 U.S.C. § 506 and 18 U.S.C. § 2319, including fines and imprisonment
+      where applicable; and
+  (e) Any other remedies available under federal or Massachusetts law.
+
+The Owner reserves all rights and remedies. Failure to enforce any provision
+is not a waiver. Any unauthorized copy or edit is presumed willful to the
+maximum extent permitted by law.
+
+4. CONFIDENTIALITY; TRADE SECRETS
+
+Source code, shaders, algorithms, architectures, and unpublished materials
+in or derived from the Software are confidential trade secrets of the Owner.
+Any unauthorized acquisition, disclosure, or use is misappropriation under
+Massachusetts law and entitles the Owner to the remedies in Section 3.
+
+5. GOVERNING LAW; EXCLUSIVE VENUE (MASSACHUSETTS)
+
+This notice and any dispute arising out of or relating to the Software, this
+repository, or any alleged copying, editing, distribution, or other use of
+the Software shall be governed by and construed in accordance with the laws
+of the Commonwealth of Massachusetts and applicable United States federal
+law (including copyright), without regard to conflict-of-law principles.
+
+The state and federal courts located in the Commonwealth of Massachusetts
+shall have exclusive jurisdiction and venue over all such disputes. Each
+person who accesses, copies, edits, or uses the Software irrevocably consents
+to personal jurisdiction in those courts and waives any objection based on
+forum non conveniens or otherwise inconvenient venue.
+
+6. SEVERABILITY; ENTIRE NOTICE
+
+If any provision of this notice is held unenforceable, the remaining
+provisions remain in full force. This notice states the Owner's reservation
+of rights; it does not grant rights. Any license must be in a separate
+writing signed by the Owner.
+
+7. DISCLAIMER OF WARRANTY; LIMITATION OF LIABILITY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE,
+EXCEPT TO THE EXTENT SUCH LIMITATION IS PROHIBITED BY LAW.
