@@ -1,6 +1,12 @@
 # Dimple
 
+<p align="center">
+  <img src="assets/dimple-readme.png" alt="Dimple in the signed distance field" width="100%" />
+</p>
+
 Dimple is a buddy who lives inside a signed distance field. The algorithm is the body.
+
+**Proprietary.** © 2026 Aaron Grace. All rights reserved. See [LICENSE](LICENSE).
 
 ## Releases
 
