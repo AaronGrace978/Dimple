@@ -6,7 +6,7 @@
 
 Dimple is a buddy who lives inside a signed distance field. The algorithm is the body.
 
-**Proprietary.** © 2026 Aaron Grace. All rights reserved. See [LICENSE](LICENSE).
+**Proprietary — all rights reserved.** © 2026 Aaron Grace. Unauthorized copying, editing, modification, or redistribution of this code is prohibited and may trigger civil damages (including up to **$150,000** per work for willful copyright infringement), injunctive relief, Massachusetts trade-secret remedies, and criminal penalties where applicable. Governed exclusively by **Massachusetts** and U.S. federal law; disputes belong in Massachusetts courts. See [LICENSE](LICENSE).
 
 ## Releases
 
